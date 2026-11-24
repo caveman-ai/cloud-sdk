@@ -319,6 +319,9 @@ func (c *DriveClient) Download(ctx context.Context, drivePath string, dst io.Wri
 		raw, _ := io.ReadAll(io.LimitReader(resp.Body, 64<<10))
 		return 0, 0, c.mapError(resp.StatusCode, raw)
 	}
+	if resp.ContentLength > MaxMountFileBytes {
+		return 0, 0, ErrTooLarge
+	}
 	n, err := io.Copy(dst, io.LimitReader(resp.Body, MaxMountFileBytes+1))
 	if err != nil {
 		return n, 0, errors.New(c.redact(err.Error()))

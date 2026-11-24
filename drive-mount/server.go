@@ -12,6 +12,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -39,6 +40,55 @@ type Server struct {
 }
 
 type putTrackerKey struct{}
+
+type copyTrackerKey struct{}
+
+type copyStatusTracker struct {
+	mu  sync.Mutex
+	err error
+}
+
+func (c *copyStatusTracker) RecordError(err error) {
+	if err == nil {
+		return
+	}
+	c.mu.Lock()
+	if c.err == nil {
+		c.err = err
+	}
+	c.mu.Unlock()
+}
+
+func (c *copyStatusTracker) Err() error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.err
+}
+
+func copyTrackerFromContext(ctx context.Context) *copyStatusTracker {
+	if ctx == nil {
+		return nil
+	}
+	t, _ := ctx.Value(copyTrackerKey{}).(*copyStatusTracker)
+	return t
+}
+
+// pathsOverlap reports whether a and b refer to the same Drive entry or one is
+// an ancestor of the other under Drive's case-folded / Unicode-equivalent keys.
+func pathsOverlap(a, b string) bool {
+	sa := splitPath(a)
+	sb := splitPath(b)
+	n := len(sa)
+	if len(sb) < n {
+		n = len(sb)
+	}
+	for i := 0; i < n; i++ {
+		if Key(sa[i]) != Key(sb[i]) {
+			return false
+		}
+	}
+	return true
+}
 
 type putBodyTracker struct {
 	r             io.ReadCloser
@@ -235,8 +285,10 @@ func (s *Server) buildHandler(dav *webdav.Handler, allowedHosts map[string]bool)
 			}
 		}
 
-		// 8. Guard COPY/MOVE against infinite descendant recursion (/A -> /A/B) and
-		//    normalize RFC 4918 default Overwrite: T on MOVE.
+		// 8. Guard COPY/MOVE against overlapping paths (self, case-equivalent, ancestor,
+		//    or descendant) using Drive's normalized per-segment keys so WebDAV never
+		//    deletes the source before moving. Handle case-only renames directly without
+		//    x/net/webdav's delete-first Overwrite path.
 		if r.Method == "COPY" || r.Method == "MOVE" {
 			if destRaw := strings.TrimSpace(r.Header.Get("Destination")); destRaw != "" {
 				destURL, uerr := url.Parse(destRaw)
@@ -250,13 +302,40 @@ func (s *Server) buildHandler(dav *webdav.Handler, allowedHosts map[string]bool)
 				}
 				srcClean, okS := CleanDrivePath(r.URL.Path)
 				dstClean, okD := CleanDrivePath(destURL.Path)
-				if !okS || !okD || dstClean == srcClean || strings.HasPrefix(dstClean, strings.TrimRight(srcClean, "/")+"/") {
+				if !okS || !okD || dstClean == srcClean {
 					http.Error(w, "invalid destination path", http.StatusForbidden)
+					return
+				}
+				// Case-only / Unicode-equivalent rename of the same entry: bypass x/net/webdav's
+				// RemoveAll(dst)-before-Rename flow so the source is never deleted.
+				if r.Method == "MOVE" && sameSegmentPath(srcClean, dstClean) {
+					if err := s.fs.Rename(r.Context(), srcClean, dstClean); err != nil {
+						switch {
+						case errors.Is(err, os.ErrNotExist):
+							http.Error(w, "not found", http.StatusNotFound)
+						case errors.Is(err, os.ErrPermission):
+							http.Error(w, "forbidden", http.StatusForbidden)
+						default:
+							http.Error(w, "move failed", http.StatusInternalServerError)
+						}
+						return
+					}
+					w.WriteHeader(http.StatusNoContent)
+					return
+				}
+				// Reject any ancestor/descendant overlap in EITHER direction (/A -> /A/B or /A/B -> /A)
+				// as well as case-equivalent COPY destinations.
+				if pathsOverlap(srcClean, dstClean) {
+					http.Error(w, "overlapping destination path", http.StatusForbidden)
 					return
 				}
 			}
 			if r.Method == "MOVE" && r.Header.Get("Overwrite") == "" {
 				r.Header.Set("Overwrite", "T")
+			}
+			if r.Method == "COPY" {
+				ct := &copyStatusTracker{}
+				r = r.WithContext(context.WithValue(r.Context(), copyTrackerKey{}, ct))
 			}
 		}
 

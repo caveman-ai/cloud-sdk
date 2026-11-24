@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net"
 	"net/url"
 	"os"
 	"os/exec"
@@ -68,6 +69,9 @@ func MountOS(ctx context.Context, srv *Server, opts MountOptions) (*ActiveMount,
 	}
 
 	if gio := resolveTrustedBinary("/usr/bin/gio", "/bin/gio"); gio != "" {
+		if opts.ExplicitMountPoint {
+			return nil, errors.New("unprivileged Linux GVFS cannot mount at an explicit --mountpoint; omit --mountpoint, run as root with davfs2, or use --webdav-only")
+		}
 		davURL := (&url.URL{
 			Scheme: "dav",
 			User:   url.User(user),
@@ -85,8 +89,11 @@ func MountOS(ctx context.Context, srv *Server, opts MountOptions) (*ActiveMount,
 		}
 		mp := davURL
 		if xdg := strings.TrimSpace(os.Getenv("XDG_RUNTIME_DIR")); xdg != "" {
-			if matches, _ := filepath.Glob(filepath.Join(xdg, "gvfs", "dav:host=127.0.0.1*")); len(matches) > 0 {
-				mp = matches[0]
+			host, port, _ := net.SplitHostPort(srv.Addr())
+			if matches, _ := filepath.Glob(filepath.Join(xdg, "gvfs", "dav:*")); len(matches) > 0 && host != "" && port != "" {
+				if exact := matchGVFSMountPath(matches, host, port); exact != "" {
+					mp = exact
+				}
 			}
 		}
 		return &ActiveMount{

@@ -1124,7 +1124,7 @@ async function mountDrive(c){
  try{
   return await new Promise((done,fail)=>{
    child.on('error',err=>{
-    if(err?.code==='ENOENT')fail(own('cave_mount_binary_missing','caveman-drive-mount binary not found in PATH. Build it with: go build -o ./bin/caveman-drive-mount ./public/drive-mount/cmd/caveman-drive-mount',1));
+    if(err?.code==='ENOENT')fail(own('cave_mount_binary_missing','caveman-drive-mount binary not found in PATH. Install it from a cloud-sdk checkout with: (cd drive-mount && go install ./cmd/caveman-drive-mount), or set CAVEMAN_DRIVE_MOUNT_BIN.',1));
     else fail(own('cave_mount_failed',`Could not start caveman-drive-mount: ${err.message}`,1));
    });
    child.on('exit',(code,signal)=>done(signal?130:(code??1)));

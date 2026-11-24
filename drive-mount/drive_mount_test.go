@@ -448,3 +448,165 @@ func TestPreparePosixMountPointSafety(t *testing.T) {
 		t.Fatalf("expected fresh mountpoint creation, got mp=%q created=%v err=%v", mp, created, err)
 	}
 }
+
+func TestHardenedWebDAVEdgeCases(t *testing.T) {
+	token := "caveman_api_test_token"
+	fake, hc := newFakeDriveHTTPClient(t, token, "team-kb")
+	fake.files["/Report.txt"] = []byte("quarterly report")
+	fake.files["/folder/sub.txt"] = []byte("nested")
+
+	client, err := NewDriveClient(ClientConfig{APIURL: "https://api.caveman.so", Token: token, Drive: "team-kb", HTTP: hc})
+	if err != nil {
+		t.Fatal(err)
+	}
+	dfs, err := NewDriveFS(client, FSOptions{ReadWrite: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer dfs.Close()
+
+	host := "127.0.0.1:49201"
+	h, user, secret, err := NewHandler(dfs, host)
+	if err != nil {
+		t.Fatal(err)
+	}
+	auth := map[string]string{"Authorization": basicAuthHeader(user, secret)}
+
+	// 1. Case-only MOVE must NOT issue DELETE (RemoveAll) before Rename.
+	rec := serveReq(h, "MOVE", "http://"+host+"/Report.txt", nil, map[string]string{
+		"Authorization": basicAuthHeader(user, secret),
+		"Destination":   "http://" + host + "/report.txt",
+	}, "", "")
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("case-only MOVE got %d, want 204: %s", rec.Code, rec.Body.String())
+	}
+	fake.mu.Lock()
+	delCount := len(fake.deletes)
+	moveCount := len(fake.moves)
+	fake.mu.Unlock()
+	if delCount != 0 {
+		t.Fatalf("case-only MOVE triggered destructive DELETE! deletes=%v", fake.deletes)
+	}
+	if moveCount != 1 {
+		t.Fatalf("expected 1 Move call for case-only rename, got %d", moveCount)
+	}
+
+	// 2. Moving descendant into ancestor (/folder/sub.txt -> /folder) MUST be refused 403 with zero deletes.
+	rec = serveReq(h, "MOVE", "http://"+host+"/folder/sub.txt", nil, map[string]string{
+		"Authorization": basicAuthHeader(user, secret),
+		"Destination":   "http://" + host + "/folder",
+	}, "", "")
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("descendant->ancestor MOVE got %d, want 403", rec.Code)
+	}
+	fake.mu.Lock()
+	delCount = len(fake.deletes)
+	fake.mu.Unlock()
+	if delCount != 0 {
+		t.Fatalf("overlapping MOVE triggered destructive DELETE! deletes=%v", fake.deletes)
+	}
+
+	// 3. Empty virtual directory rename preserves child virtual directories.
+	rec = serveReq(h, "MKCOL", "http://"+host+"/empty-parent", nil, auth, "", "")
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("MKCOL empty-parent got %d", rec.Code)
+	}
+	rec = serveReq(h, "MKCOL", "http://"+host+"/empty-parent/child", nil, auth, "", "")
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("MKCOL empty-parent/child got %d", rec.Code)
+	}
+	rec = serveReq(h, "MOVE", "http://"+host+"/empty-parent", nil, map[string]string{
+		"Authorization": basicAuthHeader(user, secret),
+		"Destination":   "http://" + host + "/renamed-parent",
+	}, "", "")
+	if rec.Code != http.StatusCreated && rec.Code != http.StatusNoContent {
+		t.Fatalf("MOVE empty-parent got %d", rec.Code)
+	}
+	if _, err := dfs.Stat(t.Context(), "/renamed-parent/child"); err != nil {
+		t.Fatalf("child virtual dir lost after parent rename: %v", err)
+	}
+
+	// 4. HEAD must serve metadata without downloading file content (works even on >256 MiB metadata).
+	var contentDownloads int
+	bigClient, err := NewDriveClient(ClientConfig{
+		APIURL: "https://api.caveman.so",
+		Token:  token,
+		Drive:  "team-kb",
+		HTTP: &http.Client{Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
+			rec := httptest.NewRecorder()
+			if strings.HasSuffix(r.URL.Path, "/files") {
+				_ = json.NewEncoder(rec).Encode(map[string]any{
+					"files": []DriveFile{{
+						Path:       "/huge.bin",
+						Kind:       "file",
+						SizeBytes:  300 << 20, // 300 MiB > 256 MiB cap
+						Version:    7,
+						MediaType:  "application/octet-stream",
+						ModifiedAt: time.Now().UTC(),
+					}},
+				})
+				return rec.Result(), nil
+			}
+			if strings.HasSuffix(r.URL.Path, "/content") {
+				if r.Method == http.MethodGet {
+					contentDownloads++
+					rec.Header().Set("Content-Length", "314572800")
+					rec.WriteHeader(http.StatusOK)
+					return rec.Result(), nil
+				}
+				if r.Method == http.MethodPut {
+					t.Errorf("SECURITY/DATA BUG: failed COPY uploaded destination file %s", r.URL.RawQuery)
+					rec.WriteHeader(http.StatusOK)
+					return rec.Result(), nil
+				}
+			}
+			rec.WriteHeader(http.StatusNotFound)
+			return rec.Result(), nil
+		})},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	bigFS, err := NewDriveFS(bigClient, FSOptions{ReadWrite: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer bigFS.Close()
+	bigH, bUser, bSecret, err := NewHandler(bigFS, host)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rec = serveReq(bigH, http.MethodHead, "http://"+host+"/huge.bin", nil, map[string]string{
+		"Authorization": basicAuthHeader(bUser, bSecret),
+	}, "", "")
+	if rec.Code != http.StatusOK {
+		t.Fatalf("HEAD on 300 MiB file got %d, want 200", rec.Code)
+	}
+	if contentDownloads != 0 {
+		t.Fatalf("HEAD triggered %d downloads, want 0", contentDownloads)
+	}
+
+	// 5. COPY of >256 MiB file fails without uploading a 0-byte destination!
+	rec = serveReq(bigH, "COPY", "http://"+host+"/huge.bin", nil, map[string]string{
+		"Authorization": basicAuthHeader(bUser, bSecret),
+		"Destination":   "http://" + host + "/huge-copy.bin",
+	}, "", "")
+	if rec.Code >= 200 && rec.Code < 300 {
+		t.Fatalf("COPY of >256 MiB file unexpectedly succeeded with %d", rec.Code)
+	}
+
+	// 6. GVFS port matching distinguishes multiple loopback mounts on different ports.
+	entries := []string{
+		"/run/user/1000/gvfs/dav:host=127.0.0.1,port=4001,user=caveman",
+		"/run/user/1000/gvfs/dav:host=127.0.0.1,port=40012,user=caveman",
+	}
+	if got := matchGVFSMountPath(entries, "127.0.0.1", "40012"); got != entries[1] {
+		t.Fatalf("matchGVFSMountPath matched wrong mount: got %q, want %q", got, entries[1])
+	}
+	if got := matchGVFSMountPath(entries, "127.0.0.1", "4001"); got != entries[0] {
+		t.Fatalf("matchGVFSMountPath matched wrong mount for port 4001: got %q, want %q", got, entries[0])
+	}
+	if got := matchGVFSMountPath(entries, "127.0.0.1", "9999"); got != "" {
+		t.Fatalf("expected empty match for unknown port, got %q", got)
+	}
+}
