@@ -1,3 +1,6 @@
+import { Gate, type GateOptions } from "./gate.js";
+export * from "./gate.js";
+
 /** `user` is an opaque end-user identifier sent as x-cave-user-hash (never a
  *  Caveman member id). The SDK forwards it verbatim — hash it yourself before
  *  passing if the raw value is PII. Mirrors the Python `Cave.user`. */
@@ -863,6 +866,24 @@ export class Cave {
    */
   retryLoopBreaker(threshold = 3): RetryLoopBreaker {
     return new RetryLoopBreaker(threshold);
+  }
+
+  /**
+   * Returns a Caveman Gate client bound to this `Cave` instance's control URL
+   * and API key so any agent action can require server-enforced human approval.
+   * Mirrors the Python `Cave.gate()`.
+   */
+  gate(options: Partial<Omit<GateOptions, "controlURL" | "apiKey">> & { controlURL?: string; apiKey?: string } = {}): Gate {
+    const rawWorkflow = options.workflow ?? this.options.defaultWorkflow;
+    const validWorkflow = rawWorkflow && /^[a-z0-9_-]{1,200}$/.test(rawWorkflow) ? rawWorkflow : undefined;
+    const gateOpts: GateOptions = {
+      ...options,
+      controlURL: options.controlURL ?? this.options.controlURL ?? this.options.baseURL,
+      apiKey: options.apiKey ?? this.options.apiKey,
+    };
+    if (validWorkflow !== undefined) gateOpts.workflow = validWorkflow;
+    else delete gateOpts.workflow;
+    return new Gate(gateOpts);
   }
 }
 

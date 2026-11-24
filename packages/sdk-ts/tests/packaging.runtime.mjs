@@ -55,6 +55,10 @@ test("package publishes only built runtime, types, license, and README", () => {
       types: "./dist/router.d.ts",
       default: "./dist/router.js",
     },
+    "./gate": {
+      types: "./dist/gate.d.ts",
+      default: "./dist/gate.js",
+    },
   });
   assert.equal(packageJSON.sideEffects, false);
   assert.equal(packageJSON.publishConfig.access, "public");
@@ -77,6 +81,7 @@ test("every entry point loads from CommonJS require() as well as import", async 
   assert.equal(typeof require("@caveman-ai/sdk/listeners").Listeners, "function");
   assert.equal(typeof require("@caveman-ai/sdk/workflows").Workflows, "function");
   assert.equal(typeof require("@caveman-ai/sdk/pools").ComputerPools, "function");
+  assert.equal(typeof require("@caveman-ai/sdk/gate").Gate, "function");
   assert.equal(typeof require("@caveman-ai/sdk/evals"), "object");
   assert.equal(typeof (await import("@caveman-ai/sdk")).Cave, "function");
 });

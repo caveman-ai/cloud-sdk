@@ -18,6 +18,7 @@ and official Cloud agent skills.
 | `python/caveman-sdk/` | `caveman-sdk` (stdlib-only Python 3.13+ SDK, `caveman_cloud`) | MIT |
 | `python/caveman-litellm/` | LiteLLM callback connector for Caveman routing & telemetry | MIT |
 | `go/` | `github.com/caveman-ai/sdk-go` (standalone Go client) | MIT |
+| `drive-mount/` | `caveman-drive-mount` (standalone Go zero-kext WebDAV desktop mount daemon for `cvm drive mount`) | Apache-2.0 |
 | `contracts/` | Sanitized public `openapi.json`, `operations.public.json`, `criterion-registry.json`, JSON schemas | MIT |
 | `parity/`, `packages/parity/`, `python/parity/` | Cross-language wire parity fixtures (TS, Python, Go must agree) | MIT |
 | `skills/` | Official Cloud agent skills (`SKILL.md` bundles + `compile.mjs` + verb/budget gates) | MIT |

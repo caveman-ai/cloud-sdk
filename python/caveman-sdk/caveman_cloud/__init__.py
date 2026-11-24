@@ -36,6 +36,7 @@ from .core import (
 from .evals import Eval, EvalControlError, EvalProjectClient, EvalUploadError, EvalWorkbenchClient, upload_eval_result
 from .agents_generated import Agents
 from .cloud import Cloud, CloudError, ResolvedPrompt
+from .gate import Gate, GateDecision, GateDeniedError, GateError, GatePending, GateRisk, GateTimeoutError
 from .platform2027 import (
     AppBridge,
     Apps,
@@ -58,6 +59,13 @@ __all__ = [
     "Cloud",
     "CloudError",
     "ComputerPools",
+    "Gate",
+    "GateDecision",
+    "GateDeniedError",
+    "GateError",
+    "GatePending",
+    "GateRisk",
+    "GateTimeoutError",
     "Listeners",
     "PlatformError",
     "Predicate",

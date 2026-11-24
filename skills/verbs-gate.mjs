@@ -43,7 +43,7 @@ const CVM_OWN_COMMANDS = [
   "drive.list", "drive.create", "drive.ls", "drive.cat", "drive.get", "drive.put", "drive.grep",
   "drive.mv", "drive.rm", "drive.log", "drive.changes", "drive.restore", "drive.share", "drive.grants",
   "drive.grant", "drive.revoke", "drive.verify", "drive.archive", "drive.unarchive", "drive.set",
-  "drive.usage", "drive.fork", "drive.merge", "drive.diff", "drive.review", "drive.approve", "drive.reject", "drive.undo",
+  "drive.usage", "drive.fork", "drive.merge", "drive.diff", "drive.review", "drive.approve", "drive.reject", "drive.undo", "drive.mount",
   "room.list", "room.create", "room.threads", "room.open", "room.post", "room.read", "room.wait",
   "room.claim", "room.renew", "room.release", "room.complete", "room.watch", "room.rollup",
   "apps.list", "apps.create", "apps.fork", "apps.token", "apps.archive",

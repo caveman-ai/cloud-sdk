@@ -2,3 +2,4 @@
 // with a service account's code:run key, or a person's token.
 export * from './agents.generated.js';
 export {CloudError} from './cloud.js';
+export * from './gate.js';

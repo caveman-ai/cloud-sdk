@@ -132,6 +132,7 @@ class _PlatformTransport:
         body: Any = None,
         *,
         idempotency_key: str | None = None,
+        timeout_seconds: float | None = None,
     ) -> dict[str, Any]:
         attempt = 0
         while True:
@@ -153,11 +154,14 @@ class _PlatformTransport:
                 headers=headers,
                 method=method,
             )
+            eff_timeout = self.timeout_seconds
+            if timeout_seconds is not None and timeout_seconds > 0:
+                eff_timeout = max(0.05, min(self.timeout_seconds, float(timeout_seconds)))
             status = 0
             raw = b""
             retry_after: int | None = None
             try:
-                resp = self._opener.open(req, timeout=self.timeout_seconds)
+                resp = self._opener.open(req, timeout=eff_timeout)
             except urllib.error.HTTPError as err:
                 resp = err
             with resp:
@@ -167,7 +171,9 @@ class _PlatformTransport:
                     ra = resp_headers.get("retry-after")
                     if ra is not None:
                         try:
-                            retry_after = int(float(ra))
+                            parsed_ra = int(float(ra))
+                            if parsed_ra >= 0:
+                                retry_after = min(parsed_ra, 60)
                         except ValueError:
                             retry_after = None
                 raw = resp.read(_LIMIT + 1)
@@ -979,6 +985,27 @@ class WorkflowContext:
     def wait_for_approval(self, ask_id: str, reason: str) -> None:
         """Park and file an Inbox human decision item automatically."""
         self.wait(kind="approval", ask_id=ask_id, reason=reason)
+
+    def approve(self, ask_id: str, reason: str, *, expires_at: str | None = None) -> None:
+        """Caveman Gate alias inside durable workflows: parks at zero compute until human approval."""
+        self.wait(kind="approval", ask_id=ask_id, reason=reason, expires_at=expires_at)
+
+    def wait_for_sensor(
+        self,
+        sensor_id: str,
+        *,
+        ask_id: str | None = None,
+        reason: str | None = None,
+        expires_at: str | None = None,
+    ) -> None:
+        """Park at zero compute until a Caveman Sensor (`listener_event`) matches and wakes this workflow."""
+        self.wait(
+            kind="listener_event",
+            target_id=sensor_id,
+            ask_id=ask_id or f"sensor:{sensor_id}",
+            reason=reason,
+            expires_at=expires_at,
+        )
 
 
 class Workflows:

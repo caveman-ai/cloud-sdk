@@ -296,6 +296,7 @@ const commands=[
  {id:'drive.approve',usage:'cvm drive approve DRIVE CHANGESET --at SEQ [--dry-run]',summary:'Put a held changeset into the drive as yours, at the head you reviewed; conflicts are listed with what was done.'},
  {id:'drive.reject',usage:'cvm drive reject DRIVE CHANGESET --yes',summary:'Drop a held changeset.'},
  {id:'drive.undo',usage:'cvm drive undo DRIVE --session ID',summary:'Take back what one session wrote to a drive.'},
+ {id:'drive.mount',usage:'cvm drive mount DRIVE[/PATH] [MOUNTPOINT] [--read-write] [--include-protected] [--webdav-only] [--volume-name NAME]',summary:'Mount a drive locally on macOS, Windows, or Linux over a hardened loopback WebDAV bridge (zero kexts, read-only and protected-path-hidden by default).'},
  {id:'sandbox.create',usage:'cvm sandbox create [--name NAME] [--size 4cpu-16gb] [--sleep-after 10m|2h|0] [--lifetime 1h] [--network none|internet] [--no-wait]',summary:'Make a sandbox and wait until it runs. It goes to sleep after 10 minutes unused unless --sleep-after says otherwise (0: never); --lifetime deletes it that long after it was made, whatever it is doing (1m to 30d); --network none gives it no network.'},
  {id:'sandbox.list',usage:'cvm sandbox list [--mine]',summary:'The sandboxes your key made, newest first. Signed in as a person, --mine keeps the ones you made.'},
  {id:'sandbox.get',usage:'cvm sandbox get SANDBOX',summary:'One sandbox: whether it runs, sleeps or failed, and its size.'},
