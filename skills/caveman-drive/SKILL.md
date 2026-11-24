@@ -20,6 +20,7 @@ cvm drive grep "policy" team-kb
 ## Core commands
 
 - Files: `cvm drive ls`, `cvm drive cat`, `cvm drive get`, `cvm drive put`, `cvm drive mv`, `cvm drive rm`, `cvm drive grep`
+- Desktop mount (macOS / Windows / Linux, zero kexts): `cvm drive mount` (read-only and protected-path-hidden by default; pass `--read-write` to enable writes)
 - History & integrity: `cvm drive log`, `cvm drive changes`, `cvm drive diff`, `cvm drive restore`, `cvm drive verify`
 - Branching & human review: `cvm drive fork`, `cvm drive merge`, `cvm drive review`, `cvm drive approve`, `cvm drive reject`, `cvm drive undo`
 - Access control: `cvm drive share`, `cvm drive grants`, `cvm drive grant`, `cvm drive revoke`

@@ -1218,6 +1218,39 @@ class Cave:
             workflow=workflow,
         )
 
+    def gate(
+        self,
+        *,
+        control_url: str | None = None,
+        api_key: str | None = None,
+        workflow: str | None = None,
+        project_id: str | None = None,
+        default_timeout_seconds: float = 600.0,
+        default_poll_interval_seconds: float = 1.5,
+        timeout_seconds: float = 30.0,
+        opener: Any = None,
+    ) -> Any:
+        """Return a Caveman Gate client bound to this ``Cave`` instance.
+
+        Uses ``control_url`` (falling back to ``Cave.control_url`` or ``Cave.base_url``)
+        and ``api_key`` (falling back to ``Cave.api_key``).
+        """
+        from .gate import Gate
+
+        resolved_wf = workflow
+        if resolved_wf is None and self.default_workflow and re.match(r"^[a-z0-9_-]{1,200}$", self.default_workflow):
+            resolved_wf = self.default_workflow
+        return Gate(
+            control_url=control_url or self.control_url or self.base_url,
+            api_key=api_key or self.api_key,
+            workflow=resolved_wf,
+            project_id=project_id,
+            default_timeout_seconds=default_timeout_seconds,
+            default_poll_interval_seconds=default_poll_interval_seconds,
+            timeout_seconds=timeout_seconds,
+            opener=opener,
+        )
+
 
 def _model_call(cave: Cave, path: str, body: Any, timeout: float) -> dict[str, Any]:
     """POST to a gateway model endpoint (route, trim, compact).

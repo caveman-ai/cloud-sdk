@@ -951,7 +951,7 @@ test('drives switched off, or a Cloud older than drives, is said in plain words;
 
 test('help answers without a sign-in or a request, for the family and for each verb',async t=>{
  const f=await fixture(t,{},{signedIn:false});
- const verbs=['list','create','ls','cat','get','put','grep','mv','rm','log','changes','restore','share','grants','grant','revoke','verify','archive','unarchive','set','usage','fork','merge','diff','review','approve','reject','undo'];
+ const verbs=['list','create','ls','cat','get','put','grep','mv','rm','log','changes','restore','share','grants','grant','revoke','verify','archive','unarchive','set','usage','fork','merge','diff','review','approve','reject','undo','mount'];
  const top=(await f.run(['drive','--help'])).json();
  assert.match(top.usage,/^cvm drive /);
  assert.deepEqual(top.commands.map(c=>c.verb),verbs);

@@ -45,7 +45,10 @@ export class WorkflowParkedError extends PlatformError {
   }
 }
 
-class PlatformTransport {
+const MAX_PLATFORM_BODY_BYTES = 16 * 1024 * 1024;
+const MAX_RETRY_AFTER_SECONDS = 60;
+
+export class PlatformTransport {
   readonly baseURL: string;
   readonly apiKey: string;
   readonly timeoutMs: number;
@@ -54,22 +57,46 @@ class PlatformTransport {
   readonly fetchFn: typeof globalThis.fetch;
 
   constructor(opts: PlatformClientOptions) {
-    const u = new URL(opts.controlURL);
-    if (u.protocol !== 'https:' && !(u.protocol === 'http:' && ['localhost', '127.0.0.1', '[::1]'].includes(u.hostname))) {
-      throw new PlatformError('cave_endpoint_invalid', 'controlURL must be HTTPS or loopback HTTP.', 0);
+    const rawURL = opts.controlURL;
+    if (typeof rawURL !== 'string' || !rawURL || rawURL !== rawURL.trim()) {
+      throw new PlatformError('cave_endpoint_invalid', 'controlURL must be a valid URL without surrounding whitespace.', 0);
+    }
+    let u: URL;
+    try {
+      u = new URL(rawURL);
+    } catch {
+      throw new PlatformError('cave_endpoint_invalid', 'controlURL must be a valid URL.', 0);
+    }
+    if (
+      u.username ||
+      u.password ||
+      u.search ||
+      u.hash ||
+      (u.protocol !== 'https:' && !(u.protocol === 'http:' && ['localhost', '127.0.0.1', '[::1]'].includes(u.hostname)))
+    ) {
+      throw new PlatformError('cave_endpoint_invalid', 'controlURL must be HTTPS or loopback HTTP without credentials, query, or fragment.', 0);
     }
     if (!opts.apiKey?.trim()) {
       throw new PlatformError('cave_auth_required', 'apiKey is required.', 0);
     }
-    this.baseURL = opts.controlURL.replace(/\/+$/, '');
+    const timeoutMs = opts.timeoutMs ?? 30_000;
+    if (!Number.isFinite(timeoutMs) || timeoutMs < 100 || timeoutMs > 120_000) {
+      throw new PlatformError('cave_timeout_invalid', 'timeoutMs must be a finite number between 100 and 120000.', 0);
+    }
+    this.baseURL = rawURL.replace(/\/+$/, '');
     this.apiKey = opts.apiKey.trim();
-    this.timeoutMs = opts.timeoutMs ?? 30_000;
-    this.retries = opts.retries ?? 2;
-    this.retryDelayMs = opts.retryDelayMs ?? 250;
+    this.timeoutMs = timeoutMs;
+    this.retries = Math.max(0, Math.floor(opts.retries ?? 2));
+    this.retryDelayMs = Math.max(0, opts.retryDelayMs ?? 250);
     this.fetchFn = opts.fetch ?? globalThis.fetch;
   }
 
-  async request<T>(method: string, path: string, body?: unknown, opts?: {signal?: AbortSignal; idempotencyKey?: string; rawBody?: string}): Promise<T> {
+  async request<T>(
+    method: string,
+    path: string,
+    body?: unknown,
+    opts?: {signal?: AbortSignal; idempotencyKey?: string; rawBody?: string; timeoutMs?: number},
+  ): Promise<T> {
     let attempt = 0;
     for (;;) {
       const headers: Record<string, string> = {
@@ -85,29 +112,55 @@ class PlatformTransport {
         headers['content-type'] = 'application/json';
         payload = JSON.stringify(body);
       }
-      const timeoutSignal = AbortSignal.timeout(this.timeoutMs);
+      const effectiveTimeout = Math.ceil(
+        opts?.timeoutMs !== undefined && Number.isFinite(opts.timeoutMs)
+          ? Math.max(50, Math.min(this.timeoutMs, opts.timeoutMs))
+          : this.timeoutMs,
+      );
+      const timeoutSignal = AbortSignal.timeout(effectiveTimeout);
       const signal = opts?.signal ? AbortSignal.any([opts.signal, timeoutSignal]) : timeoutSignal;
       const reqInit: RequestInit = {method, headers, signal, redirect: 'error'};
       if (payload !== undefined) reqInit.body = payload;
       const res = await this.fetchFn(`${this.baseURL}${path}`, reqInit);
       const text = await res.text();
+      if (new TextEncoder().encode(text).byteLength > MAX_PLATFORM_BODY_BYTES) {
+        throw new PlatformError('cave_result_too_large', 'Response exceeds 16 MiB.', res.status);
+      }
       let parsed: Record<string, unknown> = {};
       if (text) {
         try { parsed = JSON.parse(text) as Record<string, unknown>; } catch { parsed = {}; }
       }
       if (res.ok) return parsed as T;
       const retryAfterRaw = res.headers.get('retry-after');
-      const retryAfter = retryAfterRaw ? Number(retryAfterRaw) : undefined;
+      const retryAfterNum = retryAfterRaw ? Number(retryAfterRaw) : undefined;
+      const retryAfter = retryAfterNum !== undefined && Number.isFinite(retryAfterNum) && retryAfterNum >= 0
+        ? Math.min(retryAfterNum, MAX_RETRY_AFTER_SECONDS)
+        : undefined;
       if ((res.status === 429 || res.status >= 500) && attempt < this.retries) {
         attempt++;
-        const waitMs = retryAfter && Number.isFinite(retryAfter) ? retryAfter * 1000 : this.retryDelayMs * 2 ** (attempt - 1);
-        await new Promise(resolve => setTimeout(resolve, waitMs));
+        const waitMs = retryAfter !== undefined ? retryAfter * 1000 : this.retryDelayMs * 2 ** (attempt - 1);
+        await sleepAbortable(waitMs, opts?.signal);
         continue;
       }
       const errObj = (parsed.error ?? {}) as {code?: string; message?: string};
       throw new PlatformError(errObj.code || `http_${res.status}`, errObj.message || `HTTP ${res.status}`, res.status, retryAfter);
     }
   }
+}
+
+function sleepAbortable(ms: number, signal?: AbortSignal): Promise<void> {
+  if (signal?.aborted) return Promise.reject(signal.reason ?? new Error('Aborted'));
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      signal?.removeEventListener('abort', onAbort);
+      resolve();
+    }, ms);
+    const onAbort = () => {
+      clearTimeout(timer);
+      reject(signal?.reason ?? new Error('Aborted'));
+    };
+    signal?.addEventListener('abort', onAbort, {once: true});
+  });
 }
 
 /* ================================ ROOMS ================================= */
@@ -554,6 +607,29 @@ export class WorkflowContext {
   /** Parks and files a human Inbox decision item automatically. */
   waitForApproval(askId: string, reason: string): Promise<never> {
     return this.wait({kind: 'approval', ask_id: askId, reason});
+  }
+
+  /** Caveman Gate alias inside durable workflows: parks at zero compute until a verified human approves or denies in Inbox. */
+  approve(opts: {askId: string; reason: string; expiresAt?: string}): Promise<never> {
+    const req: {kind: string; ask_id?: string; reason?: string; expires_at?: string} = {
+      kind: 'approval',
+      ask_id: opts.askId,
+      reason: opts.reason,
+    };
+    if (opts.expiresAt) req.expires_at = opts.expiresAt;
+    return this.wait(req);
+  }
+
+  /** Parks at zero compute until a Caveman Sensor (`listener_event`) matches and wakes this workflow. */
+  waitForSensor(sensorId: string, opts?: {askId?: string; reason?: string; expiresAt?: string}): Promise<never> {
+    const req: {kind: string; ask_id?: string; target_id?: string; reason?: string; expires_at?: string} = {
+      kind: 'listener_event',
+      target_id: sensorId,
+      ask_id: opts?.askId ?? `sensor:${sensorId}`,
+    };
+    if (opts?.reason) req.reason = opts.reason;
+    if (opts?.expiresAt) req.expires_at = opts.expiresAt;
+    return this.wait(req);
   }
 }
 

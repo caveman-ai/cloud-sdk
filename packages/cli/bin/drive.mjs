@@ -8,7 +8,9 @@
 // stream both ways, so no upload or download is held whole in memory.
 // What a server, a drive or a local folder names is not trusted: it reaches a
 // terminal only through show, and a local disk only through within and save.
-import {constants,createWriteStream,fstatSync,linkSync,lstatSync,mkdirSync,openSync,readdirSync,realpathSync,renameSync,statSync,unlinkSync} from 'node:fs';
+import {constants,createWriteStream,existsSync,fstatSync,linkSync,lstatSync,mkdirSync,openSync,readdirSync,realpathSync,renameSync,statSync,unlinkSync} from 'node:fs';
+import {spawn} from 'node:child_process';
+import {fileURLToPath} from 'node:url';
 import {open} from 'node:fs/promises';
 import {request as plainRequest} from 'node:http';
 import {request as tlsRequest} from 'node:https';
@@ -1084,6 +1086,54 @@ async function undo(c){
   ...out.skipped.map(s=>['  left',`${show(s?.path)}  ${one(s?.reason).replaceAll('_',' ')}`])]));
 }
 
+// ---- mount (macOS / Windows / Linux zero-kext secure loopback WebDAV) ----------
+function resolveMountBinary(){
+ const envBin=process.env.CAVEMAN_DRIVE_MOUNT_BIN?.trim();
+ if(envBin&&existsSync(envBin))return {cmd:envBin,prefix:[]};
+ const ext=process.platform==='win32'?'.exe':'';
+ // Never resolve from process.cwd() — a malicious repo could plant bin/caveman-drive-mount
+ // and steal the token piped to stdin. Only trust the package-adjacent dist binary or PATH.
+ const pkgBin=resolve(dirname(fileURLToPath(import.meta.url)),'../dist/caveman-drive-mount'+ext);
+ if(existsSync(pkgBin))return {cmd:pkgBin,prefix:[]};
+ return {cmd:'caveman-drive-mount'+ext,prefix:[]};
+}
+
+async function mountDrive(c){
+ const w=where(c.args[0]??'',c.shared),[,mountpoint]=c.args;
+ const api=await c.api();
+ if(!api.token)throw new CloudError('cave_auth_required','',3);
+ const {cmd,prefix}=resolveMountBinary();
+ const args=[...prefix,'--token-stdin','--api-url',api.baseURL];
+ if(w.drive!==undefined)args.push('--drive',w.drive);
+ if(w.path&&w.path!=='/')args.push('--path',w.path);
+ if(mountpoint)args.push('--mountpoint',mountpoint);
+ if(c.values['read-write'])args.push('--read-write');
+ if(c.values['include-protected'])args.push('--include-protected');
+ if(c.values['webdav-only'])args.push('--webdav-only');
+ if(c.values['volume-name'])args.push('--volume-name',c.values['volume-name']);
+ if(c.format!=='table')args.push('--json');
+ // Strip credential env vars from the child environment; pass token strictly on stdin.
+ const env={...process.env};
+ delete env.CAVE_TOKEN;
+ delete env.CAVEMAN_DRIVE_TOKEN;
+ const child=spawn(cmd,args,{env,stdio:['pipe','inherit','inherit'],shell:false});
+ child.stdin.on('error',()=>{});
+ child.stdin.end(api.token+'\n');
+ const forward=sig=>{try{child.kill(sig);}catch{}};
+ for(const sig of INTERRUPTS)process.on(sig,forward);
+ try{
+  return await new Promise((done,fail)=>{
+   child.on('error',err=>{
+    if(err?.code==='ENOENT')fail(own('cave_mount_binary_missing','caveman-drive-mount binary not found in PATH. Build it with: go build -o ./bin/caveman-drive-mount ./public/drive-mount/cmd/caveman-drive-mount',1));
+    else fail(own('cave_mount_failed',`Could not start caveman-drive-mount: ${err.message}`,1));
+   });
+   child.on('exit',(code,signal)=>done(signal?130:(code??1)));
+  });
+ }finally{
+  for(const sig of INTERRUPTS)process.off(sig,forward);
+ }
+}
+
 // ---- the command ------------------------------------------------------------------
 // flags: what a verb takes beyond --format, --help, --token and --instance.
 // args: how many positionals, [least, most]; shared: the same with a share
@@ -1117,9 +1167,10 @@ const VERBS={
  approve:{usage:'cvm drive approve DRIVE CHANGESET --at SEQ [--dry-run]',summary:'Put a changeset\'s writes into the drive as yours, by the merge\'s rules: where both changed a file the drive\'s side stays and the session\'s goes beside it, and a file you deleted that the session changed comes back. Every conflict is listed with what was done. --at is the changeset\'s head you reviewed, which review prints; a changeset the session wrote more to since is refused, to be reviewed again. --dry-run shows what approving does, at --at or the head now, and decides nothing.',flags:['dry-run','at'],args:[2,2],run:approve,cannot:'approve a changeset'},
  reject:{usage:'cvm drive reject DRIVE CHANGESET --yes',summary:'Drop a changeset: nothing of it reaches the drive. Needs --yes.',flags:['yes'],args:[2,2],run:reject,cannot:'reject a changeset'},
  undo:{usage:'cvm drive undo DRIVE --session ID',summary:'Take back what one session wrote to the drive, in one commit. What someone else changed since is left and listed.',flags:['session'],args:[1,1],run:undo,cannot:'undo a session'},
+ mount:{usage:'cvm drive mount DRIVE[/PATH] [MOUNTPOINT] [--read-write] [--include-protected] [--webdav-only] [--volume-name NAME]',summary:'Mount a drive locally on macOS, Windows, or Linux over a hardened loopback WebDAV bridge (zero kexts, read-only and protected-path-hidden by default).',flags:['read-write','include-protected','webdav-only','volume-name'],args:[1,2],shared:[0,2],run:mountDrive},
 };
 const text={type:'string'},flag={type:'boolean'};
-const OPTIONS={resume:text,description:text,keep:text,recursive:{...flag,short:'r'},version:text,lines:text,overwrite:flag,'include-protected':flag,force:flag,'dry-run':flag,glob:text,'ignore-case':{...flag,short:'i'},fixed:{...flag,short:'F'},context:{...text,short:'C'},limit:text,
+const OPTIONS={resume:text,description:text,keep:text,recursive:{...flag,short:'r'},version:text,lines:text,overwrite:flag,'include-protected':flag,'read-write':flag,'webdav-only':flag,'volume-name':text,force:flag,'dry-run':flag,glob:text,'ignore-case':{...flag,short:'i'},fixed:{...flag,short:'F'},context:{...text,short:'C'},limit:text,
  yes:{...flag,short:'y'},after:text,to:text,read:flag,write:flag,for:text,label:text,until:text,at:text,from:text,status:text,session:text,token:text,instance:text,format:text,help:{...flag,short:'h'}};
 const NOTES=[
  'An address is DRIVE[/PATH]: the drive\'s name or id, then a path inside it.',

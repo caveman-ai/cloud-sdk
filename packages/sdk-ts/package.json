@@ -50,6 +50,10 @@
     "./router": {
       "types": "./dist/router.d.ts",
       "default": "./dist/router.js"
+    },
+    "./gate": {
+      "types": "./dist/gate.d.ts",
+      "default": "./dist/gate.js"
     }
   },
   "files": [
