@@ -609,4 +609,96 @@ func TestHardenedWebDAVEdgeCases(t *testing.T) {
 	if got := matchGVFSMountPath(entries, "127.0.0.1", "9999"); got != "" {
 		t.Fatalf("expected empty match for unknown port, got %q", got)
 	}
+
+	// 7. Case-only MOVE must respect WebDAV locks (423 Locked when locked without token).
+	lockBody := `<?xml version="1.0" encoding="utf-8"?><D:lockinfo xmlns:D="DAV:"><D:lockscope><D:exclusive/></D:lockscope><D:locktype><D:write/></D:locktype></D:lockinfo>`
+	rec = serveReq(h, "LOCK", "http://"+host+"/report.txt", strings.NewReader(lockBody), auth, "", "")
+	if rec.Code != http.StatusOK {
+		t.Fatalf("LOCK /report.txt got %d: %s", rec.Code, rec.Body.String())
+	}
+	rec = serveReq(h, "MOVE", "http://"+host+"/report.txt", nil, map[string]string{
+		"Authorization": basicAuthHeader(user, secret),
+		"Destination":   "http://" + host + "/REPORT.txt",
+	}, "", "")
+	if rec.Code != http.StatusLocked {
+		t.Fatalf("case-only MOVE on locked file without token got %d, want 423", rec.Code)
+	}
+
+	// 8. GET after file grows remotely serves full new bytes (never truncated to cached SizeBytes),
+	//    and HEAD on an extensionless file never downloads its content.
+	var extlessDownloads int
+	liveBody := []byte("short")
+	growClient, err := NewDriveClient(ClientConfig{
+		APIURL: "https://api.caveman.so",
+		Token:  token,
+		Drive:  "team-kb",
+		HTTP: &http.Client{Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
+			rec := httptest.NewRecorder()
+			if strings.HasSuffix(r.URL.Path, "/files") {
+				_ = json.NewEncoder(rec).Encode(map[string]any{
+					"files": []DriveFile{
+						{Path: "/notes.txt", Kind: "file", SizeBytes: 5, Version: 1, MediaType: "text/plain", ModifiedAt: time.Now().UTC()},
+						{Path: "/README", Kind: "file", SizeBytes: 4096, Version: 1, MediaType: "application/octet-stream", ModifiedAt: time.Now().UTC()},
+					},
+				})
+				return rec.Result(), nil
+			}
+			if strings.HasSuffix(r.URL.Path, "/content") {
+				if r.URL.Query().Get("path") == "/README" {
+					extlessDownloads++
+				}
+				rec.WriteHeader(http.StatusOK)
+				_, _ = rec.Write(liveBody)
+				return rec.Result(), nil
+			}
+			rec.WriteHeader(http.StatusNotFound)
+			return rec.Result(), nil
+		})},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	growFS, err := NewDriveFS(growClient, FSOptions{ReadWrite: false})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer growFS.Close()
+	growH, gUser, gSecret, err := NewHandler(growFS, host)
+	if err != nil {
+		t.Fatal(err)
+	}
+	gAuth := map[string]string{"Authorization": basicAuthHeader(gUser, gSecret)}
+	// Prime directory cache with SizeBytes=5, then grow remote content to 30 bytes.
+	rec = serveReq(growH, http.MethodHead, "http://"+host+"/README", nil, gAuth, "", "")
+	if rec.Code != http.StatusOK || extlessDownloads != 0 {
+		t.Fatalf("HEAD on extensionless file got %d with %d downloads, want 200 and 0 downloads", rec.Code, extlessDownloads)
+	}
+	liveBody = []byte("grown remotely past five bytes")
+	rec = serveReq(growH, http.MethodGet, "http://"+host+"/notes.txt", nil, gAuth, "", "")
+	if rec.Code != http.StatusOK || rec.Body.String() != string(liveBody) {
+		t.Fatalf("GET grown file got code=%d body=%q, want full %q", rec.Code, rec.Body.String(), string(liveBody))
+	}
+
+	// 9. VerifySubpath allows write-only share tokens (403 on ListFiles).
+	woClient, err := NewDriveClient(ClientConfig{
+		APIURL: "https://api.caveman.so",
+		Token:  "cdrv_write_only_share_token",
+		HTTP: &http.Client{Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
+			rec := httptest.NewRecorder()
+			rec.WriteHeader(http.StatusForbidden)
+			_, _ = rec.WriteString(`{"error":{"code":"forbidden","message":"write-only share"}}`)
+			return rec.Result(), nil
+		})},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	woFS, err := NewDriveFS(woClient, FSOptions{Subpath: "/uploads", ReadWrite: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer woFS.Close()
+	if err := woFS.VerifySubpath(t.Context()); err != nil {
+		t.Fatalf("VerifySubpath blocked write-only share token: %v", err)
+	}
 }

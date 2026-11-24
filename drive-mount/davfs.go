@@ -133,6 +133,11 @@ func (d *DriveFS) VerifySubpath(ctx context.Context) error {
 	}
 	_, err := d.client.ListFiles(ctx, d.subpath, false)
 	if err != nil {
+		if errors.Is(err, ErrPermission) && strings.HasPrefix(d.client.token, ShareTokenPrefix) {
+			// Write-only share tokens refuse directory listings (403) while still
+			// permitting create-only uploads under the configured subpath.
+			return nil
+		}
 		if errors.Is(err, ErrNotFound) {
 			return fmt.Errorf("drive subfolder %q does not exist", d.subpath)
 		}
@@ -461,13 +466,34 @@ func (d *DriveFS) Rename(ctx context.Context, oldName, newName string) error {
 	}
 
 	// Support renaming a newly created empty virtual directory (preserving any nested virtual children).
+	oldPrefix := oldRel + "/"
 	d.mu.Lock()
 	ts, wasVirtual := d.virtualDirs[oldRel]
 	if wasVirtual {
 		delete(d.virtualDirs, oldRel)
 		d.virtualDirs[newRel] = ts
+		movedChildren := make(map[string]time.Time)
+		for k, cts := range d.virtualDirs {
+			if strings.HasPrefix(k, oldPrefix) {
+				delete(d.virtualDirs, k)
+				movedChildren[newRel+strings.TrimPrefix(k, oldRel)] = cts
+			}
+		}
+		for nk, cts := range movedChildren {
+			d.virtualDirs[nk] = cts
+		}
 	}
-	oldPrefix := oldRel + "/"
+	d.mu.Unlock()
+	if wasVirtual {
+		d.invalidate(oldRel, newRel)
+		return nil
+	}
+
+	if err := d.client.Move(ctx, oldRemote, newRemote); err != nil {
+		return mapFSError(err)
+	}
+	// Move any nested mount-only virtual subfolders only AFTER the remote move succeeds.
+	d.mu.Lock()
 	movedChildren := make(map[string]time.Time)
 	for k, cts := range d.virtualDirs {
 		if strings.HasPrefix(k, oldPrefix) {
@@ -479,14 +505,6 @@ func (d *DriveFS) Rename(ctx context.Context, oldName, newName string) error {
 		d.virtualDirs[nk] = cts
 	}
 	d.mu.Unlock()
-	if wasVirtual {
-		d.invalidate(oldRel, newRel)
-		return nil
-	}
-
-	if err := d.client.Move(ctx, oldRemote, newRemote); err != nil {
-		return mapFSError(err)
-	}
 	d.invalidate(oldRel, newRel)
 	return nil
 }
@@ -852,6 +870,9 @@ func (f *readFile) Close() error {
 func (f *readFile) Read(p []byte) (int, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
+	if isHeadRequest(f.reqCtx) {
+		return 0, io.EOF
+	}
 	if err := f.ensureDownloaded(); err != nil {
 		return 0, err
 	}
@@ -868,32 +889,37 @@ func (f *readFile) Write([]byte) (int, error) { return 0, os.ErrPermission }
 func (f *readFile) Seek(off int64, w int) (int64, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	if f.tmp != nil {
-		pos, err := f.tmp.Seek(off, w)
-		if err == nil {
-			f.pos = pos
+	if isHeadRequest(f.reqCtx) && f.tmp == nil {
+		// Serve metadata-only seeks on HEAD from verified Drive metadata without
+		// downloading the file body.
+		var base int64
+		switch w {
+		case io.SeekStart:
+			base = 0
+		case io.SeekCurrent:
+			base = f.pos
+		case io.SeekEnd:
+			base = f.info.Size()
+		default:
+			return 0, os.ErrInvalid
 		}
-		return pos, err
+		next := base + off
+		if next < 0 {
+			return 0, os.ErrInvalid
+		}
+		f.pos = next
+		return f.pos, nil
 	}
-	// Serve metadata-only seeks (such as http.ServeContent on HEAD) from verified
-	// Drive metadata without downloading the file body.
-	var base int64
-	switch w {
-	case io.SeekStart:
-		base = 0
-	case io.SeekCurrent:
-		base = f.pos
-	case io.SeekEnd:
-		base = f.info.Size()
-	default:
-		return 0, os.ErrInvalid
+	// On GET/COPY, ensure the live file is downloaded before answering Seek so
+	// ServeContent always reports the current byte length (never stale cached size).
+	if err := f.ensureDownloaded(); err != nil {
+		return 0, err
 	}
-	next := base + off
-	if next < 0 {
-		return 0, os.ErrInvalid
+	pos, err := f.tmp.Seek(off, w)
+	if err == nil {
+		f.pos = pos
 	}
-	f.pos = next
-	return f.pos, nil
+	return pos, err
 }
 
 func (f *readFile) Readdir(int) ([]os.FileInfo, error) { return nil, os.ErrInvalid }

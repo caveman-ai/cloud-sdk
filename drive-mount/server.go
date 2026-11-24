@@ -43,6 +43,82 @@ type putTrackerKey struct{}
 
 type copyTrackerKey struct{}
 
+type headRequestKey struct{}
+
+func isHeadRequest(ctx context.Context) bool {
+	v, _ := ctx.Value(headRequestKey{}).(bool)
+	return v
+}
+
+func confirmOrTempLock(ls webdav.LockSystem, src, dst, ifHeader string) (func(), int, error) {
+	if ls == nil {
+		return func() {}, 0, nil
+	}
+	now := time.Now()
+	conds := extractIfLockTokens(ifHeader)
+	if len(conds) > 0 {
+		if release, err := ls.Confirm(now, src, dst, conds...); err == nil {
+			return release, 0, nil
+		}
+		if release, err := ls.Confirm(now, src, "", conds...); err == nil {
+			tokDst, derr := ls.Create(now, webdav.LockDetails{Root: dst, Duration: time.Minute})
+			if derr == nil {
+				return func() {
+					_ = ls.Unlock(time.Now(), tokDst)
+					release()
+				}, 0, nil
+			}
+			release()
+			if errors.Is(derr, webdav.ErrLocked) {
+				return nil, http.StatusLocked, derr
+			}
+			return nil, http.StatusInternalServerError, derr
+		}
+		return nil, http.StatusPreconditionFailed, webdav.ErrConfirmationFailed
+	}
+	tokSrc, err := ls.Create(now, webdav.LockDetails{Root: src, Duration: time.Minute})
+	if err != nil {
+		if errors.Is(err, webdav.ErrLocked) {
+			return nil, http.StatusLocked, err
+		}
+		return nil, http.StatusInternalServerError, err
+	}
+	tokDst, err := ls.Create(now, webdav.LockDetails{Root: dst, Duration: time.Minute})
+	if err != nil {
+		_ = ls.Unlock(time.Now(), tokSrc)
+		if errors.Is(err, webdav.ErrLocked) {
+			return nil, http.StatusLocked, err
+		}
+		return nil, http.StatusInternalServerError, err
+	}
+	return func() {
+		_ = ls.Unlock(time.Now(), tokDst)
+		_ = ls.Unlock(time.Now(), tokSrc)
+	}, 0, nil
+}
+
+func extractIfLockTokens(ifHeader string) []webdav.Condition {
+	var conds []webdav.Condition
+	s := ifHeader
+	for {
+		start := strings.IndexByte(s, '<')
+		if start < 0 {
+			break
+		}
+		s = s[start+1:]
+		end := strings.IndexByte(s, '>')
+		if end < 0 {
+			break
+		}
+		tok := strings.TrimSpace(s[:end])
+		if tok != "" {
+			conds = append(conds, webdav.Condition{Token: tok})
+		}
+		s = s[end+1:]
+	}
+	return conds
+}
+
 type copyStatusTracker struct {
 	mu  sync.Mutex
 	err error
@@ -307,8 +383,15 @@ func (s *Server) buildHandler(dav *webdav.Handler, allowedHosts map[string]bool)
 					return
 				}
 				// Case-only / Unicode-equivalent rename of the same entry: bypass x/net/webdav's
-				// RemoveAll(dst)-before-Rename flow so the source is never deleted.
+				// RemoveAll(dst)-before-Rename flow so the source is never deleted, while still
+				// confirming WebDAV locks on src/dst.
 				if r.Method == "MOVE" && sameSegmentPath(srcClean, dstClean) {
+					release, status, lerr := confirmOrTempLock(dav.LockSystem, srcClean, dstClean, r.Header.Get("If"))
+					if lerr != nil {
+						http.Error(w, http.StatusText(status), status)
+						return
+					}
+					defer release()
 					if err := s.fs.Rename(r.Context(), srcClean, dstClean); err != nil {
 						switch {
 						case errors.Is(err, os.ErrNotExist):
@@ -337,6 +420,10 @@ func (s *Server) buildHandler(dav *webdav.Handler, allowedHosts map[string]bool)
 				ct := &copyStatusTracker{}
 				r = r.WithContext(context.WithValue(r.Context(), copyTrackerKey{}, ct))
 			}
+		}
+
+		if r.Method == http.MethodHead {
+			r = r.WithContext(context.WithValue(r.Context(), headRequestKey{}, true))
 		}
 
 		// 9. Track PUT request-body completion so truncated/aborted PUTs never commit.

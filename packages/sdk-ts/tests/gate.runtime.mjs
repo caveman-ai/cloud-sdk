@@ -301,4 +301,24 @@ test('Gate rejects action mismatch on dedupe reuse, enforces deadline across 429
   assert.equal(resolvedApproval.resolved_by, 'alice@acme.test');
   const resolvedSensor = await wctx.waitForSensor('sensor-99', {reason: 'Wait CI'});
   assert.equal(resolvedSensor.status, 'resolved');
+
+  // 4. Denied / expired / cancelled workflow approval replay MUST fail closed!
+  for (const deniedStatus of ['denied', 'expired', 'cancelled']) {
+    const deniedMock = makeMockFetch({
+      'POST /api/v1/code/workflows/runs/run-1/wait': ({body}) => ({
+        status: 200,
+        body: {id: `wait-${deniedStatus}`, session_id: 's1', kind: body.kind, ask_id: body.ask_id, status: deniedStatus, created_at: '2026-11-23T00:00:00Z'},
+      }),
+    });
+    const dwf = new Workflows({controlURL: 'https://app.caveman.so', apiKey: 'cave_live_k', fetch: deniedMock.fetchFn});
+    const dwctx = new WorkflowContext(dwf, 'run-1', 's1');
+    await assert.rejects(
+      () => dwctx.waitForApproval('deploy-1', 'Deploy prod'),
+      (err) => err && err.code === 'workflow_approval_denied',
+    );
+    await assert.rejects(
+      () => dwctx.approve({askId: 'deploy-1', reason: 'Deploy prod'}),
+      (err) => err && err.code === 'workflow_approval_denied',
+    );
+  }
 });

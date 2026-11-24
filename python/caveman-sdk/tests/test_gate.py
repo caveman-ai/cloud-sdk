@@ -272,6 +272,25 @@ class GateTests(unittest.TestCase):
         srow = wctx.wait_for_sensor("sensor-99", reason="Wait CI")
         self.assertEqual(srow["status"], "resolved")
 
+        # 4. Denied / expired / cancelled workflow approval replay MUST fail closed.
+        for bad_status in ("denied", "expired", "cancelled"):
+            denied_opener = _FakeOpener(
+                {
+                    "POST /api/v1/code/workflows/runs/run-1/wait": lambda b, st=bad_status: (
+                        200,
+                        {"id": f"w-{st}", "session_id": "s1", "kind": b["kind"], "ask_id": b.get("ask_id"), "status": st},
+                    ),
+                }
+            )
+            dwf = Workflows(control_url="https://app.caveman.so", api_key="cave_live_k", opener=denied_opener)
+            dwctx = WorkflowContext(dwf, "run-1", "s1")
+            with self.assertRaises(Exception) as c_wait:
+                dwctx.wait_for_approval("deploy-1", "Deploy prod")
+            self.assertEqual(getattr(c_wait.exception, "code", None), "workflow_approval_denied")
+            with self.assertRaises(Exception) as c_app:
+                dwctx.approve("deploy-1", "Deploy prod")
+            self.assertEqual(getattr(c_app.exception, "code", None), "workflow_approval_denied")
+
 
 if __name__ == "__main__":
     unittest.main()

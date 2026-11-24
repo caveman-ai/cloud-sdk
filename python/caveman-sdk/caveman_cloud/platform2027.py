@@ -1004,12 +1004,28 @@ class WorkflowContext:
         return self.wait(kind="timer", expires_at=expires, reason=reason)
 
     def wait_for_approval(self, ask_id: str, reason: str) -> dict[str, Any]:
-        """Park and file an Inbox human decision item automatically; returns the terminal wait on replay."""
-        return self.wait(kind="approval", ask_id=ask_id, reason=reason)
+        """Park and file an Inbox human decision item automatically; fails closed unless approved/resolved."""
+        wait_row = self.wait(kind="approval", ask_id=ask_id, reason=reason)
+        st = str(wait_row.get("status") or "").lower()
+        if st not in ("resolved", "approved"):
+            raise PlatformError(
+                "workflow_approval_denied",
+                f'Workflow approval "{ask_id}" was not approved (status={st or "unknown"}).',
+                403,
+            )
+        return wait_row
 
     def approve(self, ask_id: str, reason: str, *, expires_at: str | None = None) -> dict[str, Any]:
-        """Caveman Gate alias inside durable workflows: parks at zero compute until human approval."""
-        return self.wait(kind="approval", ask_id=ask_id, reason=reason, expires_at=expires_at)
+        """Caveman Gate alias inside durable workflows: parks at zero compute until human approval; fails closed unless approved/resolved."""
+        wait_row = self.wait(kind="approval", ask_id=ask_id, reason=reason, expires_at=expires_at)
+        st = str(wait_row.get("status") or "").lower()
+        if st not in ("resolved", "approved"):
+            raise PlatformError(
+                "workflow_approval_denied",
+                f'Workflow approval "{ask_id}" was not approved (status={st or "unknown"}).',
+                403,
+            )
+        return wait_row
 
     def wait_for_sensor(
         self,

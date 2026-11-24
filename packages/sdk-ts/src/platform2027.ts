@@ -633,20 +633,38 @@ export class WorkflowContext {
     return this.wait({kind: 'timer', expires_at, reason});
   }
 
-  /** Parks and files a human Inbox decision item automatically; returns the terminal wait on replay. */
-  waitForApproval(askId: string, reason: string): Promise<SessionWait> {
-    return this.wait({kind: 'approval', ask_id: askId, reason});
+  /** Parks and files a human Inbox decision item automatically; fails closed on replay unless approved/resolved. */
+  async waitForApproval(askId: string, reason: string): Promise<SessionWait> {
+    const w = await this.wait({kind: 'approval', ask_id: askId, reason});
+    const st = (w?.status ?? '').toLowerCase();
+    if (st !== 'resolved' && st !== 'approved') {
+      throw new PlatformError(
+        'workflow_approval_denied',
+        `Workflow approval "${askId}" was not approved (status=${st || 'unknown'}).`,
+        403,
+      );
+    }
+    return w;
   }
 
-  /** Caveman Gate alias inside durable workflows: parks at zero compute until a verified human approves or denies in Inbox; returns the terminal wait on replay. */
-  approve(opts: {askId: string; reason: string; expiresAt?: string}): Promise<SessionWait> {
+  /** Caveman Gate alias inside durable workflows: parks at zero compute until a verified human approves; fails closed unless approved/resolved. */
+  async approve(opts: {askId: string; reason: string; expiresAt?: string}): Promise<SessionWait> {
     const req: {kind: string; ask_id?: string; reason?: string; expires_at?: string} = {
       kind: 'approval',
       ask_id: opts.askId,
       reason: opts.reason,
     };
     if (opts.expiresAt) req.expires_at = opts.expiresAt;
-    return this.wait(req);
+    const w = await this.wait(req);
+    const st = (w?.status ?? '').toLowerCase();
+    if (st !== 'resolved' && st !== 'approved') {
+      throw new PlatformError(
+        'workflow_approval_denied',
+        `Workflow approval "${opts.askId}" was not approved (status=${st || 'unknown'}).`,
+        403,
+      );
+    }
+    return w;
   }
 
   /** Parks at zero compute until a Caveman Sensor (`listener_event`) matches and wakes this workflow; returns the terminal wait on replay. */
