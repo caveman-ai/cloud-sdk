@@ -4,7 +4,7 @@
 // when the skill triggers; level 2 one reference, loaded when the task needs
 // it. A layer that grows past its line fails here: split it, do not raise it.
 // The MCP half (server instructions, tool descriptions) is
-// cloud/agent-surface/tests/mcp.test.mjs.
+// the public MCP contract tests.
 
 import { test } from "node:test";
 import assert from "node:assert/strict";

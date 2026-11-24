@@ -74,7 +74,7 @@ class Fake:
     def __init__(self, rest: Callable[[BaseHTTPRequestHandler, bytes], None] | None = None) -> None:
         self.replay, self.refuse, self.close_raw = "", "", None
         # host_down streams answer as a computer whose host is restarting does (the lab cannot make one: the
-        # service's words, cloud/computers/streams): its error with retry_after, then close 4503; with
+        # sandbox stream wire contract): its error with retry_after, then close 4503; with
         # host_down_output, after some output (the command had started).
         self.host_down, self.retry_after, self.host_down_output = 0, 0, False
         # A sandbox's files, as the files wire answers them (the sandbox files wire protocol): a path to

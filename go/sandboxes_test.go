@@ -79,13 +79,13 @@ type fakeSandboxes struct {
 	seen     []string
 	used     map[string]bool
 	// hostDown streams answer as a computer whose host is restarting does (the lab cannot make one:
-	// the service's words, cloud/computers/streams): its error with retryAfter, then close 4503;
+	// the sandbox stream wire contract): its error with retryAfter, then close 4503;
 	// with hostDownOutput, after some output (the command had started).
 	hostDown       int
 	retryAfter     int
 	hostDownOutput bool
-	// files is a sandbox's files, as the files wire answers them (cloud/internal/computerstream
-	// files.go): a path to its bytes, or to nil for a folder; fileOps every first message; dialed the
+	// files is a sandbox's files, per the sandbox files wire contract: a path to
+	// its bytes, or to nil for a folder; fileOps every first message; dialed the
 	// ports dialed, portRefused: nothing listens on one.
 	files       map[string]*fakeFile
 	fileOps     []filesStart

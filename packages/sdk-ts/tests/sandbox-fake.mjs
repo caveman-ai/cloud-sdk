@@ -4,7 +4,7 @@
 // REST calls by method, path and body; a command's stream by replaying the recording its client
 // messages match (or the one named in state.replay); a refusal before the upgrade by state.refuse.
 // state.hostDown streams answer as a computer whose host is restarting does (the lab cannot make one:
-// the service's words, cloud/computers/streams): its error with retry_after state.retryAfter, then
+// the sandbox stream wire contract): its error with retry_after state.retryAfter, then
 // close 4503; with state.hostDownOutput, after some output (the command had started).
 // A waiting read (GET's wait_for, timeout) is answered at once as the plain read is, with the Cave-Wait
 // the API would say of that answer; with waits false, as a Caveman Cloud that does not wait: no Cave-Wait.

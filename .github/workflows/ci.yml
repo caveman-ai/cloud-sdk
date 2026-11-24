@@ -24,6 +24,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm -r build
       - run: pnpm -r test
+      - run: node scripts/check-public-hygiene.mjs
       - run: node --test skills/budget.test.mjs
 
   go:

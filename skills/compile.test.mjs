@@ -149,7 +149,7 @@ test("caveman-optimize uses report-only observations and cannot select retired m
   for (const id of ["context-window-profile", "tool-catalog-profile", "exploration-load-profile"]) {
     assert.match(skill, new RegExp(`\\b${id}\\b`), `${id} must be handled as an exact report-only observation`);
   }
-  // Founder 2026-10-06 (D1): tool-output-size-profile left the report-only list with a dollar band.
+  // Policy: tool-output-size-profile stays out of the report-only list with a dollar band.
   assert.doesNotMatch(skill, /tool-output-size-profile/);
   assert.match(skill, /explicit operator choice/i);
   assert.match(skill, /paired eval/i);

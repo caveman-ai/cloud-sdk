@@ -2,8 +2,8 @@
 //
 // Invariant: a skill can never document a command, MCP tool, or SDK call the
 // shipped surfaces do not expose. This module derives the real surfaces from
-// source — the Cloud command inventory (cloud/agent-surface/dist/surface.json,
-// written by `node cloud/agent-surface/scripts/build.mjs`) for `cvm` commands and
+// source — the public Cloud command inventory (contracts/operations.public.json
+// or a local surface.json) for `cvm` commands and
 // Cloud MCP tools, the reserved-verbs registry for the local `caveman` CLI, the
 // engine MCP manifest, and the two SDKs' method definitions — then scans each
 // canonical SKILL.md for references and reports anything that does not resolve.
@@ -55,7 +55,7 @@ const CVM_OWN_COMMANDS = [
 // Derive every surface a skill may reference. `errors` is non-empty when a
 // source could not be parsed — the caller must fail closed rather than scan
 // against an empty surface (which would pass everything).
-export function loadSurfaces({ skillsDir, surfaceFile = join(skillsDir, "..", "..", "cloud", "agent-surface", "dist", "surface.json") }) {
+export function loadSurfaces({ skillsDir, surfaceFile = join(skillsDir, "..", "contracts", "operations.public.json") }) {
   const errors = [];
   const publicRoot = join(skillsDir, "..");
   const packageRoot = existsSync(join(publicRoot, "sdk"))
@@ -91,7 +91,7 @@ export function loadSurfaces({ skillsDir, surfaceFile = join(skillsDir, "..", ".
     for (const tool of surface.mcp_tools) mcpTools.add(tool);
     if (cloudCommands.size === 0) throw new Error("no commands");
   } catch (error) {
-    errors.push(`Cloud surface ${surfaceFile} (run node cloud/agent-surface/scripts/build.mjs): ${error.message}`);
+    errors.push(`Cloud surface ${surfaceFile}: ${error.message}`);
   }
 
   // Engine MCP server tool names (Go), pinned by engine-mcp-tools.json.

@@ -2,7 +2,7 @@
 // reference a command, MCP tool, or SDK call the shipped surfaces do not
 // expose, and passes clean skills. The gate lives in verbs-gate.mjs and is wired
 // into compile.mjs's fail-closed path (make check-drift). It reads the Cloud
-// command inventory, so run `node cloud/agent-surface/scripts/build.mjs` first.
+// command inventory from contracts/operations.public.json.
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
