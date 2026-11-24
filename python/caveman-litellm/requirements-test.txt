@@ -1,0 +1,8 @@
+# Real gateway conformance target, separate from customer dependency resolution.
+litellm[proxy]==1.108.3
+# As the litellm extra: every filelock before 4.2.1 is in an advisory's range, and 1.108.3 is the first LiteLLM that takes a fixed one.
+filelock==4.2.4
+fastapi==0.136.3
+opentelemetry-exporter-otlp-proto-http==1.45.2
+opentelemetry-instrumentation-fastapi==0.66b2
+pytest==9.1.1

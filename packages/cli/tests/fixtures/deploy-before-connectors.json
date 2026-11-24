@@ -1,0 +1,110 @@
+{
+ "recorded": "cvm deploy on commit 486fe276b (before connectors), against deploy.test.mjs's loopback fixture: the triage folder, a new agent and a new deployment. {digest}, {digest12}, {size}, {bytes} and {agent.json} stand for what the build of that folder is, which follows the cvm version in built_by.",
+ "build_at_cvm_0.0.0": {
+  "digest": "d151969b63b95ac8d4548dee40bda16264f40b96e65d3a9f2c98cf7c9fffbe34",
+  "bytes": 741,
+  "agent.json bytes": 649
+ },
+ "cases": {
+  "created_table": {
+   "code": 0,
+   "stdout": "triage  v1  3 files, {size}  sha256 {digest12}\nlive    triage (revision 1, created)\ntry     cvm run triage \"…\"\n",
+   "requests": [
+    {
+     "method": "GET",
+     "path": "/api/v1/code/agents"
+    },
+    {
+     "method": "POST",
+     "path": "/api/v1/code/agents",
+     "body": {
+      "name": "triage",
+      "build": {
+       "files": {
+        "agent.json": "{agent.json}",
+        "AGENT.md": "---\nname: triage\ndescription: Triages tickets\n---\nYou triage support tickets.\n",
+        "skills/refunds/SKILL.md": "Refund rules.\n"
+       }
+      }
+     }
+    },
+    {
+     "method": "GET",
+     "path": "/api/v1/code/deployments/triage"
+    },
+    {
+     "method": "POST",
+     "path": "/api/v1/code/deployments",
+     "body": {
+      "name": "triage",
+      "agent": {
+       "id": "00000000-0000-4000-8000-0000000000a1",
+       "version": 1
+      },
+      "config": {
+       "repo": "acme/support"
+      },
+      "source": {
+       "trigger": "cli"
+      }
+     }
+    }
+   ]
+  },
+  "created_json": {
+   "code": 0,
+   "stdout": "{\"schema_version\":1,\"ok\":true,\"status\":\"created\",\"agent\":{\"id\":\"00000000-0000-4000-8000-0000000000a1\",\"name\":\"triage\",\"version\":1,\"stored\":\"new version\"},\"build\":{\"sha256\":\"{digest}\",\"file_count\":3,\"bytes\":{bytes}},\"deployment\":{\"id\":\"00000000-0000-4000-8000-0000000000d1\",\"name\":\"triage\",\"status\":\"live\",\"revision\":1},\"config\":{\"repo\":\"acme/support\"},\"source\":{\"trigger\":\"cli\"},\"blocked_by\":[],\"next\":\"cvm run triage \\\"…\\\"\"}\n",
+   "requests": [
+    {
+     "method": "GET",
+     "path": "/api/v1/code/agents"
+    },
+    {
+     "method": "POST",
+     "path": "/api/v1/code/agents",
+     "body": {
+      "name": "triage",
+      "build": {
+       "files": {
+        "agent.json": "{agent.json}",
+        "AGENT.md": "---\nname: triage\ndescription: Triages tickets\n---\nYou triage support tickets.\n",
+        "skills/refunds/SKILL.md": "Refund rules.\n"
+       }
+      }
+     }
+    },
+    {
+     "method": "GET",
+     "path": "/api/v1/code/deployments/triage"
+    },
+    {
+     "method": "POST",
+     "path": "/api/v1/code/deployments",
+     "body": {
+      "name": "triage",
+      "agent": {
+       "id": "00000000-0000-4000-8000-0000000000a1",
+       "version": 1
+      },
+      "config": {
+       "repo": "acme/support"
+      },
+      "source": {
+       "trigger": "cli"
+      }
+     }
+    }
+   ]
+  },
+  "dry_table": {
+   "code": 0,
+   "stdout": "triage   3 files, {size}  sha256 {digest12}\ndry run  nothing sent. A deploy would:\n  1. find the agent named triage (GET /api/v1/code/agents)\n  2. create the agent triage with this build, when there is none (POST /api/v1/code/agents)\n  3. or store this build as its next version, with the version read (nothing is stored when the build is unchanged) (POST /api/v1/code/agents/{agent id})\n  4. read the deployment triage: its live settings are kept (GET /api/v1/code/deployments/triage)\n  5. make the agent version live as triage (POST /api/v1/code/deployments)\n  settings  the live ones, unchanged\n  source    cli\n",
+   "requests": []
+  },
+  "dry_json": {
+   "code": 0,
+   "stdout": "{\"schema_version\":1,\"ok\":true,\"status\":\"dry_run\",\"agent\":\"triage\",\"sha256\":\"{digest}\",\"file_count\":3,\"bytes\":{bytes},\"deployment\":\"triage\",\"config\":{},\"source\":{\"trigger\":\"cli\"},\"would_send\":[{\"method\":\"GET\",\"path\":\"/api/v1/code/agents\",\"why\":\"find the agent named triage\"},{\"method\":\"POST\",\"path\":\"/api/v1/code/agents\",\"why\":\"create the agent triage with this build, when there is none\",\"body\":{\"name\":\"triage\",\"build\":{\"files\":{\"agent.json\":\"{agent.json bytes} bytes\",\"AGENT.md\":\"78 bytes\",\"skills/refunds/SKILL.md\":\"14 bytes\"}}}},{\"method\":\"POST\",\"path\":\"/api/v1/code/agents/{agent id}\",\"why\":\"or store this build as its next version, with the version read (nothing is stored when the build is unchanged)\",\"body\":{\"build\":\"the same files\",\"version\":\"the version read\"}},{\"method\":\"GET\",\"path\":\"/api/v1/code/deployments/triage\",\"why\":\"read the deployment triage: its live settings are kept\"},{\"method\":\"POST\",\"path\":\"/api/v1/code/deployments\",\"why\":\"make the agent version live as triage\",\"body\":{\"name\":\"triage\",\"agent\":{\"id\":\"the agent above\",\"version\":\"its version\"},\"config\":{},\"source\":{\"trigger\":\"cli\"}},\"config_note\":\"the live settings, unchanged\"}]}\n",
+   "requests": []
+  }
+ }
+}

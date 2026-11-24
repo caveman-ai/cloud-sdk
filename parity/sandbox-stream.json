@@ -1,0 +1,117 @@
+{
+  "note": "The wire of a stream into a sandbox from outside it (a command's, a file operation's and a port's), as cloud/internal/computerstream/wire.go and cloud/relay (computers.go, relay.go) speak it. scripts/generate-cloud-sdk.mjs writes it into each SDK; the Caveman sandbox test harness TestSandboxStreamParity holds it to the Go constants, so a change there that is not made here fails a test. Every code is the API's (cave_...): the same in a refusal before the upgrade (the API's error envelope), in an error message and as a close's reason. retry: the codes a client opens a stream again after (a refusal before the upgrade, or the stream's error before any output or exit), waiting after_seconds (or the refusal's Retry-After or the error's retry_after), at most tries opens within within_ms, and only while its stdin can be sent again. files: a stream at files.path does one operation of files.ops, its first message {\"type\":\"files\",\"op\",\"path\",...}; a read answers the file's bytes as binary messages (no channel byte) then a file message, a write sends them then close_stdin and is answered a file message, list answers entries batches then done, stat a file message, mkdir, remove and rename done. dial: a stream at dial.path is a TCP connection to that port on the sandbox's own loopback, its bytes binary both ways, close_write a half close from either side. Their own errors (the file system's refusals, a port nothing listens on) close with their own status. options: a start may set env (at most max_env entries and max_env_bytes, key=value, together), cwd (absolute), user and, with tty, cols and rows (each 1 to max_term_size); while the command runs, {\"type\":\"resize\",\"cols\",\"rows\"} resizes its terminal and {\"type\":\"signal\",\"signal\"} sends its process group one of signals (SIG prefix optional). A sandbox that takes no options refuses a start that sets one (cave_code_computer_unsupported); a resize or a signal it cannot take is answered {\"type\":\"refused\",\"of\",\"code\",\"message\"}, and the command goes on.",
+  "path": "/relay/v1/computers/{computerId}/exec",
+  "subprotocol": "caveman.computer.v1",
+  "channels": {
+    "stdout": 1,
+    "stderr": 2
+  },
+  "limits": {
+    "max_control": 65536,
+    "max_input": 65536,
+    "max_output": 32768,
+    "max_args": 1024,
+    "max_argv_bytes": 49152
+  },
+  "types": {
+    "start": "start",
+    "close_stdin": "close_stdin",
+    "resize": "resize",
+    "signal": "signal",
+    "exit": "exit",
+    "error": "error",
+    "refused": "refused",
+    "files": "files",
+    "file": "file",
+    "entries": "entries",
+    "done": "done",
+    "close_write": "close_write"
+  },
+  "errors": {
+    "cave_code_computer_unsupported": "The sandbox cannot do what was asked.",
+    "cave_bad_request": "A message the sandbox could not read, or out of order.",
+    "cave_code_computer_not_running": "The sandbox is not running; resume it first.",
+    "cave_code_computer_stopped": "The sandbox was put to sleep or deleted while the command ran.",
+    "cave_code_computer_stream_too_slow": "The output was not read fast enough.",
+    "cave_code_computer_stream_age": "The command ran as long as one stream may.",
+    "cave_code_computer_start_timeout": "No command was sent in time.",
+    "cave_internal": "The sandbox service failed.",
+    "cave_code_computer_streams_limit": "The sandbox has as many commands running from outside as it may.",
+    "cave_rate_limit_exceeded": "Commands are being started faster than allowed; wait a moment.",
+    "cave_code_computer_ticket_refused": "The sandbox service refused the stream.",
+    "cave_unauthorized": "Access to the sandbox ended, or the key was refused.",
+    "cave_code_computer_stream_ended": "The stream ended before the command exited.",
+    "cave_code_computer_host_unreachable": "The sandbox's host is not answering just now (it may be restarting); the command was not started. Try again in a moment.",
+    "cave_code_computer_file_not_found": "No such file or folder in the sandbox.",
+    "cave_code_computer_file_permission": "The sandbox's user may not do that to this file.",
+    "cave_code_computer_file_exists": "There is a file there already.",
+    "cave_code_computer_file_too_large": "The sandbox's disk is full, or the file is larger than its file system takes.",
+    "cave_code_computer_file_refused": "The sandbox's file system refused it; the message says how.",
+    "cave_code_computer_port_refused": "Nothing in the sandbox listens on that port."
+  },
+  "close_codes": {
+    "4400": "cave_bad_request",
+    "4401": "cave_unauthorized",
+    "4404": "cave_code_computer_stream_ended",
+    "4405": "cave_code_computer_unsupported",
+    "4408": "cave_code_computer_stream_too_slow",
+    "4409": "cave_code_computer_not_running",
+    "4410": "cave_code_computer_stopped",
+    "4500": "cave_internal",
+    "4503": "cave_code_computer_host_unreachable",
+    "4601": "cave_code_computer_file_not_found",
+    "4602": "cave_code_computer_file_permission",
+    "4603": "cave_code_computer_file_exists",
+    "4604": "cave_code_computer_file_refused",
+    "4605": "cave_code_computer_file_too_large",
+    "4606": "cave_code_computer_port_refused"
+  },
+  "retry": {
+    "codes": [
+      "cave_code_computer_host_unreachable"
+    ],
+    "after_seconds": 2,
+    "tries": 5,
+    "within_ms": 15000
+  },
+  "files": {
+    "path": "/relay/v1/computers/{computerId}/files",
+    "ops": [
+      "read",
+      "write",
+      "list",
+      "stat",
+      "mkdir",
+      "remove",
+      "rename"
+    ],
+    "file_types": [
+      "file",
+      "dir",
+      "symlink",
+      "other"
+    ],
+    "max_path": 4096
+  },
+  "dial": {
+    "path": "/relay/v1/computers/{computerId}/dial/{port}"
+  },
+  "options": {
+    "signals": [
+      "INT",
+      "TERM",
+      "HUP",
+      "QUIT",
+      "KILL",
+      "USR1",
+      "USR2",
+      "WINCH",
+      "CONT",
+      "STOP",
+      "TSTP"
+    ],
+    "max_term_size": 65535,
+    "max_env": 256,
+    "max_env_bytes": 65536
+  }
+}

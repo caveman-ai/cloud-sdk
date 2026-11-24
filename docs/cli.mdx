@@ -1,0 +1,43 @@
+`cvm` (`@caveman-ai/cloud`) exposes every Caveman Cloud operation from the terminal and serves the `caveman-cloud` stdio MCP server.
+
+## Install and sign in
+
+```bash
+npm install -g @caveman-ai/cloud
+cvm setup --project YOUR_PROJECT_ID
+```
+
+## Common commands
+
+```bash
+cvm login
+cvm projects list
+cvm traces search --help
+cvm traces tail
+cvm sql "SELECT model, count() FROM requests GROUP BY model"
+cvm tools list
+cvm mcp
+```
+
+## Output and exit codes
+
+`cvm` prints readable tables on a TTY and JSON when piped; override with `--format json|jsonl|table`.
+
+| Exit code | Meaning |
+|---|---|
+| `0` | Success |
+| `1` | Request failed or runtime crash |
+| `2` | Invalid usage or schema validation failure (HTTP 400/422) |
+| `3` | Signed out or forbidden (HTTP 401/403) |
+| `4` | Conflict or feature disabled (HTTP 409) |
+| `5` | Eval comparison or CI gate failed |
+| `6` | Timeout, still running, or not enough data |
+| `7` | Rate limited (HTTP 429) |
+
+## Undo setup
+
+```bash
+cvm setup --remove
+```
+
+Removes the skills and MCP config entries `cvm setup` added while leaving unrelated config intact.

@@ -1,0 +1,18 @@
+`@caveman-ai/sdk` is a zero-dependency TypeScript client supporting both ESM `import` and CommonJS `require()`.
+
+## Install
+
+```bash
+npm install @caveman-ai/sdk
+```
+
+## Entrypoints
+
+| Subpath | Exports | Purpose |
+|---|---|---|
+| `@caveman-ai/sdk` | `Cave`, `OTelExporter`, `CaveRequestError` | Gateway proxy, tracing, prefix assembly, tool search, checkpoints |
+| `@caveman-ai/sdk/cloud` | `Cloud`, `CloudError` | Typed generated client for all 389 Cloud control-plane operations |
+| `@caveman-ai/sdk/agents` | `Agents` | Agents API sessions, streaming events, file uploads |
+| `@caveman-ai/sdk/sandboxes` | `Sandboxes` | Firecracker sandbox lifecycle, exec streams, file copy, snapshots |
+| `@caveman-ai/sdk/evals` | `Eval`, eval clients | Dataset/experiment authoring, runs, baseline verdicts |
+| `@caveman-ai/sdk/router` | `RouterClient` | Caveman Router `/v1/route` and `/v1/task` client |

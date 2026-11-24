@@ -1,0 +1,73 @@
+{
+  "comment": "One named eval, as both SDKs must put it on the wire. tests/test_eval_harness.py and tests/eval-harness.runtime.mjs run it and compare each request body; trace_id and latency_ms are dropped from outputs first.",
+  "name": "support",
+  "data": [
+    {"input": "q1", "expected": "a1"},
+    {"id": "two", "input": "q2", "expected": "a2", "tags": ["split:test"]}
+  ],
+  "criterion": {"id": "22222222-2222-4222-8222-222222222222", "name": "Grounded", "version": 3},
+  "inline": [
+    {"type": "contains", "name": "Mentions the answer", "fragments": ["a"]},
+    {"type": "json_schema", "schema": {"type": "string"}}
+  ],
+  "trials": 2,
+  "budget_usd": 1.5,
+  "comparison": {
+    "baseline_run_id": "run-0", "baseline_source": "experiment", "candidate_run_id": "run-1", "policy": "kernel", "policy_source": "experiment", "quality": "need_more_data",
+    "summary": "Grounded: 0 of 2 cases improved, 0 regressed; too few cases to call.",
+    "paired_cells": 2, "regressions": 0, "improvements": 0, "unchanged": 4, "unpaired": 0,
+    "changed_cases": [], "statistics": null
+  },
+  "requests": {
+    "datasets.create": {
+      "name": "support",
+      "description": "Local eval \"support\" run by the Caveman SDK. Outputs are produced by the caller's task, not by Caveman.",
+      "upsert": true,
+      "document": {
+        "schema_version": 1,
+        "columns": [
+          {"key": "input", "name": "Input", "type": "json", "role": "input"},
+          {"key": "expected", "name": "Expected", "type": "json", "role": "expected"}
+        ],
+        "rows": [
+          {"row_key": "row-1", "values": {"input": "q1", "expected": "a1"}},
+          {"row_key": "two", "values": {"input": "q2", "expected": "a2"}, "tags": ["split:test"]}
+        ]
+      }
+    },
+    "evals.create": {
+      "name": "support",
+      "description": "Local eval \"support\" run by the Caveman SDK. Outputs are produced by the caller's task, not by Caveman.",
+      "upsert": true,
+      "document": {
+        "schema_version": 1,
+        "datasets": [{"key": "cases", "dataset_id": "dataset-1"}],
+        "targets": [{"key": "local_task", "name": "Local task (run by the SDK)", "kind": "external", "input_mapping": {}, "config": {}}],
+        "evaluators": [
+          {"key": "grounded", "name": "Grounded", "source": "criterion", "criterion_id": "22222222-2222-4222-8222-222222222222", "criterion_version": 3},
+          {"key": "json_schema", "name": "json_schema", "source": "inline", "grader_type": "json_schema", "options": {"schema": {"type": "string"}},
+           "input_mapping": {"candidate": {"source": "target", "key": "$target"}, "reference": {"source": "dataset", "key": "expected"}}},
+          {"key": "mentions_the_answer", "name": "Mentions the answer", "source": "inline", "grader_type": "contains", "options": {"fragments": ["a"]},
+           "input_mapping": {"candidate": {"source": "target", "key": "$target"}, "reference": {"source": "dataset", "key": "expected"}}}
+        ]
+      }
+    },
+    "evals.run": {
+      "workbench_id": "workbench-1",
+      "scope": {"kind": "all", "trials": 2, "budget_usd": 1.5},
+      "outputs": [
+        {"row_key": "row-1", "trial": 1, "attempts": 1, "output": "a1"},
+        {"row_key": "row-1", "trial": 2, "attempts": 1, "output": "a1"},
+        {"row_key": "two", "trial": 1, "attempts": 1, "output": "a2"},
+        {"row_key": "two", "trial": 2, "attempts": 1, "output": "a2"}
+      ]
+    },
+    "evals.get_baseline": {"workbench_id": "workbench-1"},
+    "evals.compare": {"workbench_id": "workbench-1", "candidate_run_id": "run-1"}
+  },
+  "baseline": {
+    "run_id": "run-0", "source": "experiment", "comparable": true, "computed_by": "caveman", "verdict": "need_more_data", "policy": "kernel", "policy_source": "experiment",
+    "summary": "Grounded: 0 of 2 cases improved, 0 regressed; too few cases to call.",
+    "paired_cases": 2, "regressions": 0, "improvements": 0, "unchanged": 4, "unpaired": 0, "changed_cases": [], "statistics": null
+  }
+}

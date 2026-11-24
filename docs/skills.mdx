@@ -1,0 +1,9 @@
+Official Caveman Cloud skills live in `skills/` and are validated against `contracts/operations.public.json` so every verb, flag, and MCP tool matches the live API.
+
+## Install into your coding agents
+
+```bash
+cvm setup --project YOUR_PROJECT_ID
+```
+
+`cvm setup` installs the `caveman-cloud` skill bundle into `~/.claude/skills/caveman-cloud` (for Claude Code) and `~/.agents/skills/caveman-cloud` (read by Codex, Cursor, VS Code, Windsurf, Gemini CLI, and OpenCode). Every subsequent `cvm` upgrade refreshes the installed skill automatically.

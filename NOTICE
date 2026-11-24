@@ -1,0 +1,14 @@
+Caveman Cloud SDK & CLI (caveman-ai/cloud-sdk)
+Copyright 2026 Caveman AI, Inc.
+
+Packages licensed under the Apache License, Version 2.0 (see LICENSE):
+  - @caveman-ai/cloud (cvm CLI)
+  - @caveman-ai/router-claude-code
+
+Packages and artifacts licensed under the MIT License:
+  - @caveman-ai/sdk (packages/sdk-ts)
+  - caveman-sdk (python/caveman-sdk)
+  - caveman-router (python/caveman-litellm)
+  - github.com/caveman-ai/sdk-go (go/)
+  - skills/
+  - contracts/

@@ -1,0 +1,41 @@
+Define an evaluation suite in one JSON file (`*.eval.json`) and gate changes against a saved baseline in GitHub Actions, GitLab CI, Buildkite, or locally.
+
+## Create and run an eval file
+
+```bash
+cvm evals init
+cvm evals validate example.eval.json
+cvm evals run example.eval.json --set-baseline-on-pass
+cvm evals ci evals/*.eval.json
+```
+
+## Example `support.eval.json`
+
+```json
+{
+  "name": "support-answers",
+  "dataset": {
+    "cases": [
+      {
+        "id": "refund",
+        "input": { "question": "How do I get a refund?" },
+        "expected": "Within 30 days.",
+        "tags": ["billing"]
+      }
+    ]
+  },
+  "task": { "command": ["node", "answer.mjs"] },
+  "criteria": [
+    "Grounded",
+    { "type": "contains", "fragments": ["30 days"] }
+  ],
+  "trials": 3,
+  "gate": { "baseline": "saved", "policy": "strict" },
+  "budget_usd": 2
+}
+```
+
+## Gate policies
+
+- **`strict`**: fails if any criterion regresses on any case. Decides on small suites.
+- **`statistical`**: decides on paired confidence intervals (requires ~30+ cases; exits `6` when more data is needed).

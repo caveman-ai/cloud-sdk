@@ -1,0 +1,25 @@
+Deploy an `AGENT.md` folder as an immutable revision under a deployment name, inspect its connector plan, and roll back cleanly.
+
+## Build, deploy, run, rollback
+
+```bash
+cvm agent build ./triage
+cvm deploy ./triage --repo acme/support --budget 2
+cvm run triage "Where is order 1042?"
+cvm deployments revisions triage
+cvm deployments rollback triage 2
+```
+
+Unchanged builds create no new revision. Pass `--dry-run` to inspect the exact manifest and API calls without sending anything.
+
+## Org connectors
+
+An admin signs an MCP server in once for the organization; agent builds reference connectors by name only (`connectors: [linear]`), never by URL or secret.
+
+```bash
+cvm connect add linear
+cvm connect ls
+cvm connect diff linear
+cvm connect accept linear
+cvm connect grant linear --to triage
+```

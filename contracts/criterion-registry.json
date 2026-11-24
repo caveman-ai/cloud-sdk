@@ -1,0 +1,1448 @@
+{
+  "inputs": [
+    {
+      "name": "output",
+      "meaning": "The answer under test: a run's output for a case, a recorded unit's final answer."
+    },
+    {
+      "name": "expected",
+      "meaning": "The known good answer of a case. A recorded unit has none, so a kind that reads it runs on dataset rows only."
+    },
+    {
+      "name": "context",
+      "meaning": "The passages retrieved for the answer. On a recorded trace a judge reads the retrieval steps; in a run the output must carry them, because a judge is shown the output alone."
+    },
+    {
+      "name": "question",
+      "meaning": "What was asked: a case's input, a recorded unit's request. In a run a judge sees it only when the output repeats it, except for a pairwise question."
+    },
+    {
+      "name": "baseline",
+      "meaning": "Another answer to the same case, to compare with."
+    },
+    {
+      "name": "tool_calls",
+      "meaning": "The tool calls made, each with its name and arguments."
+    },
+    {
+      "name": "metrics",
+      "meaning": "What was measured: latency, cost, tokens and the HTTP status."
+    },
+    {
+      "name": "steps",
+      "meaning": "The recorded steps of a span, trace or task, in order."
+    }
+  ],
+  "categories": [
+    {
+      "key": "match",
+      "label": "Text match"
+    },
+    {
+      "key": "structure",
+      "label": "Structure"
+    },
+    {
+      "key": "tools",
+      "label": "Tool calls"
+    },
+    {
+      "key": "thresholds",
+      "label": "Thresholds"
+    },
+    {
+      "key": "similarity",
+      "label": "Similarity"
+    },
+    {
+      "key": "retrieval",
+      "label": "Retrieval"
+    },
+    {
+      "key": "safety",
+      "label": "Safety"
+    },
+    {
+      "key": "judge",
+      "label": "LLM judge"
+    },
+    {
+      "key": "external",
+      "label": "External"
+    },
+    {
+      "key": "trajectory",
+      "label": "Trajectory rules"
+    },
+    {
+      "key": "code",
+      "label": "Code"
+    }
+  ],
+  "kinds": [
+    {
+      "id": "exact_match",
+      "kind": "output_grader",
+      "name": "Exact match",
+      "checks": "Passes when the answer equals the expected value after trimming, case folding and key-order-insensitive JSON normalisation.",
+      "category": "match",
+      "inputs": [
+        "output",
+        "expected"
+      ],
+      "options": [
+        {
+          "name": "expected",
+          "type": "any",
+          "required": false,
+          "description": "The value to compare against. The TypeScript grader object carries it here; the Python grade service reads the case reference instead, so a suite that only sets this option compares against the fixture reference on the service."
+        },
+        {
+          "name": "case_sensitive",
+          "type": "boolean",
+          "required": false,
+          "default": false,
+          "description": "Skip the case-folding step; JSON normalisation is unchanged."
+        },
+        {
+          "name": "remove_punctuation",
+          "type": "boolean",
+          "required": false,
+          "default": false,
+          "description": "Delete ASCII punctuation before comparing; string-only, and fails closed when either side is a structured value."
+        }
+      ],
+      "calls_model": false,
+      "cost": "free"
+    },
+    {
+      "id": "contains",
+      "kind": "output_grader",
+      "name": "Contains",
+      "checks": "Passes when every listed fragment appears somewhere in the answer, matched case-sensitively as a substring.",
+      "category": "match",
+      "inputs": [
+        "output"
+      ],
+      "options": [
+        {
+          "name": "fragments",
+          "type": "array",
+          "required": true,
+          "description": "Fragments that must all be present. Legacy behaviour kept for compatibility: the Python service stringifies a non-string member instead of failing."
+        }
+      ],
+      "calls_model": false,
+      "cost": "free"
+    },
+    {
+      "id": "not_contains",
+      "kind": "output_grader",
+      "name": "Does not contain",
+      "checks": "Passes only when none of the listed fragments appear in the answer.",
+      "category": "match",
+      "inputs": [
+        "output"
+      ],
+      "options": [
+        {
+          "name": "fragments",
+          "type": "array",
+          "required": true,
+          "description": "Forbidden fragments; a non-string member is an invalid option and fails closed."
+        }
+      ],
+      "calls_model": false,
+      "cost": "free"
+    },
+    {
+      "id": "regex",
+      "kind": "output_grader",
+      "name": "Regex match",
+      "checks": "Passes when the pattern matches the answer, using each language's own regex engine on the portable pattern subset.",
+      "category": "match",
+      "inputs": [
+        "output"
+      ],
+      "options": [
+        {
+          "name": "pattern",
+          "type": "string",
+          "required": true,
+          "description": "Regular expression searched in the answer text; an invalid pattern fails closed."
+        }
+      ],
+      "calls_model": false,
+      "cost": "free"
+    },
+    {
+      "id": "not_regex",
+      "kind": "output_grader",
+      "name": "Regex must not match",
+      "checks": "Passes when the pattern does not match the answer, after CRLF and a single trailing newline are normalised away.",
+      "category": "match",
+      "inputs": [
+        "output"
+      ],
+      "options": [
+        {
+          "name": "pattern",
+          "type": "string",
+          "required": true,
+          "description": "Regular expression that must not match; an empty or invalid pattern fails closed."
+        }
+      ],
+      "calls_model": false,
+      "cost": "free"
+    },
+    {
+      "id": "blocklist",
+      "kind": "output_grader",
+      "name": "Blocklist",
+      "checks": "Passes when none of the listed terms appear as whole words in the answer, compared case-insensitively.",
+      "category": "safety",
+      "inputs": [
+        "output"
+      ],
+      "options": [
+        {
+          "name": "terms",
+          "type": "array",
+          "required": true,
+          "description": "Forbidden terms; word boundaries are pinned lookarounds, not the engine's own word-character rule."
+        }
+      ],
+      "calls_model": false,
+      "cost": "free"
+    },
+    {
+      "id": "json_schema",
+      "kind": "output_grader",
+      "name": "JSON schema",
+      "checks": "Passes when the answer satisfies a small JSON-Schema subset covering type, enum, required, properties and items only.",
+      "category": "structure",
+      "inputs": [
+        "output"
+      ],
+      "options": [
+        {
+          "name": "schema",
+          "type": "object",
+          "required": true,
+          "description": "The subset schema the answer must satisfy; an unknown type name fails closed."
+        }
+      ],
+      "calls_model": false,
+      "cost": "free"
+    },
+    {
+      "id": "json_path_assertion",
+      "kind": "output_grader",
+      "name": "JSON path",
+      "checks": "Passes when the dotted path resolves in the answer and, when equals is set, holds that value.",
+      "category": "structure",
+      "inputs": [
+        "output"
+      ],
+      "options": [
+        {
+          "name": "path",
+          "type": "string",
+          "required": true,
+          "description": "Dot-separated path; array steps are numeric indexes."
+        },
+        {
+          "name": "equals",
+          "type": "any",
+          "required": false,
+          "description": "Optional value assertion at the path; comparison is type-strict."
+        },
+        {
+          "name": "exists",
+          "type": "boolean",
+          "required": false,
+          "description": "Assert only presence (true) or absence (false) of the path, ignoring equals."
+        }
+      ],
+      "calls_model": false,
+      "cost": "free"
+    },
+    {
+      "id": "tool_called",
+      "kind": "output_grader",
+      "name": "Tool called",
+      "checks": "Passes when every listed tool appears in the answer's tool calls.",
+      "category": "tools",
+      "inputs": [
+        "tool_calls"
+      ],
+      "options": [
+        {
+          "name": "tools",
+          "type": "array",
+          "required": true,
+          "description": "Tool names that must all have been called."
+        }
+      ],
+      "calls_model": false,
+      "cost": "free"
+    },
+    {
+      "id": "tool_not_called",
+      "kind": "output_grader",
+      "name": "Tool not called",
+      "checks": "Passes when none of the listed tools appear in the answer's tool calls.",
+      "category": "tools",
+      "inputs": [
+        "tool_calls"
+      ],
+      "options": [
+        {
+          "name": "tools",
+          "type": "array",
+          "required": true,
+          "description": "Tool names that must not have been called."
+        }
+      ],
+      "calls_model": false,
+      "cost": "free"
+    },
+    {
+      "id": "tool_sequence",
+      "kind": "output_grader",
+      "name": "Tool sequence",
+      "checks": "Passes when the listed tools appear as an ordered subsequence of the tool calls; other calls may sit between them.",
+      "category": "tools",
+      "inputs": [
+        "tool_calls"
+      ],
+      "options": [
+        {
+          "name": "tools",
+          "type": "array",
+          "required": true,
+          "description": "Tool names in the order they must appear."
+        }
+      ],
+      "calls_model": false,
+      "cost": "free"
+    },
+    {
+      "id": "tool_argument_assertion",
+      "kind": "output_grader",
+      "name": "Tool argument",
+      "checks": "Passes when some call to the named tool carries the argument at path equal to the expected value.",
+      "category": "tools",
+      "inputs": [
+        "tool_calls"
+      ],
+      "options": [
+        {
+          "name": "tool",
+          "type": "string",
+          "required": true,
+          "description": "Name of the tool call to inspect."
+        },
+        {
+          "name": "path",
+          "type": "string",
+          "required": true,
+          "description": "Dot-separated path inside that call's arguments."
+        },
+        {
+          "name": "equals",
+          "type": "any",
+          "required": true,
+          "description": "Value the argument must equal; comparison is type-strict."
+        }
+      ],
+      "calls_model": false,
+      "cost": "free"
+    },
+    {
+      "id": "http_status",
+      "kind": "output_grader",
+      "name": "HTTP status",
+      "checks": "Passes when the answer's status field equals the expected status code; an answer without a status fails.",
+      "category": "thresholds",
+      "inputs": [
+        "metrics"
+      ],
+      "options": [
+        {
+          "name": "status",
+          "type": "integer",
+          "required": true,
+          "description": "Expected status, read from the answer's status or status_code field."
+        }
+      ],
+      "calls_model": false,
+      "cost": "free"
+    },
+    {
+      "id": "latency_threshold",
+      "kind": "output_grader",
+      "name": "Latency ceiling",
+      "checks": "Passes when the answer's recorded p95 latency is at or under the ceiling; an unmeasured answer fails.",
+      "category": "thresholds",
+      "inputs": [
+        "metrics"
+      ],
+      "options": [
+        {
+          "name": "p95_ms",
+          "type": "number",
+          "required": true,
+          "description": "Ceiling in milliseconds, compared against the answer's p95_ms or latency_ms field."
+        }
+      ],
+      "calls_model": false,
+      "cost": "free"
+    },
+    {
+      "id": "cost_threshold",
+      "kind": "output_grader",
+      "name": "Cost ceiling",
+      "checks": "Passes when the answer's recorded cost is at or under the ceiling; an unmeasured answer fails.",
+      "category": "thresholds",
+      "inputs": [
+        "metrics"
+      ],
+      "options": [
+        {
+          "name": "max_usd",
+          "type": "number",
+          "required": true,
+          "description": "Ceiling in US dollars, compared against the answer's cost_usd or total_cost_usd field."
+        }
+      ],
+      "calls_model": false,
+      "cost": "free"
+    },
+    {
+      "id": "token_threshold",
+      "kind": "output_grader",
+      "name": "Token ceiling",
+      "checks": "Passes when the answer's recorded token count is at or under the ceiling; an unmeasured answer fails.",
+      "category": "thresholds",
+      "inputs": [
+        "metrics"
+      ],
+      "options": [
+        {
+          "name": "max_tokens",
+          "type": "number",
+          "required": true,
+          "description": "Ceiling in tokens, compared against the answer's tokens or total_tokens field."
+        }
+      ],
+      "calls_model": false,
+      "cost": "free"
+    },
+    {
+      "id": "bleu_score",
+      "kind": "output_grader",
+      "name": "BLEU score",
+      "checks": "Modified n-gram precision with a brevity penalty against a reference string on a pinned tokenizer, so it is deterministic but not comparable to published sacrebleu numbers.",
+      "category": "similarity",
+      "inputs": [
+        "output",
+        "expected"
+      ],
+      "options": [
+        {
+          "name": "reference",
+          "type": "string",
+          "required": true,
+          "description": "Reference text; the Python service falls back to the case reference when this option is absent."
+        },
+        {
+          "name": "threshold",
+          "type": "number",
+          "required": false,
+          "default": 0.5,
+          "description": "Score the answer must reach to pass."
+        }
+      ],
+      "calls_model": false,
+      "cost": "free"
+    },
+    {
+      "id": "rouge_score",
+      "kind": "output_grader",
+      "name": "ROUGE score",
+      "checks": "Unigram or longest-common-subsequence overlap against a reference string on the same pinned tokenizer, so it is deterministic but not comparable to published rouge-score numbers.",
+      "category": "similarity",
+      "inputs": [
+        "output",
+        "expected"
+      ],
+      "options": [
+        {
+          "name": "reference",
+          "type": "string",
+          "required": true,
+          "description": "Reference text; the Python service falls back to the case reference when this option is absent."
+        },
+        {
+          "name": "rouge_type",
+          "type": "string",
+          "required": false,
+          "default": "rouge_1",
+          "enum": [
+            "rouge_1",
+            "rouge_l"
+          ],
+          "description": "Unigram overlap or longest common subsequence."
+        },
+        {
+          "name": "measure",
+          "type": "string",
+          "required": false,
+          "default": "fmeasure",
+          "enum": [
+            "precision",
+            "recall",
+            "fmeasure"
+          ],
+          "description": "Which figure the threshold is applied to."
+        },
+        {
+          "name": "threshold",
+          "type": "number",
+          "required": false,
+          "default": 0.5,
+          "description": "Score the answer must reach to pass."
+        }
+      ],
+      "calls_model": false,
+      "cost": "free"
+    },
+    {
+      "id": "context_f1",
+      "kind": "output_grader",
+      "name": "Context F1",
+      "checks": "Precision, recall or F1 between the retrieved and expected context lists, matched by normalised Levenshtein similarity.",
+      "category": "retrieval",
+      "inputs": [
+        "context",
+        "expected"
+      ],
+      "options": [
+        {
+          "name": "retrieved",
+          "type": "array",
+          "required": true,
+          "description": "Context chunks the system retrieved; both lists ride on the options and the answer value is unused."
+        },
+        {
+          "name": "expected",
+          "type": "array",
+          "required": true,
+          "description": "Context chunks that should have been retrieved."
+        },
+        {
+          "name": "measure",
+          "type": "string",
+          "required": false,
+          "default": "f1",
+          "enum": [
+            "precision",
+            "recall",
+            "f1"
+          ],
+          "description": "Which figure the threshold is applied to."
+        },
+        {
+          "name": "similarity_threshold",
+          "type": "number",
+          "required": false,
+          "default": 0.7,
+          "description": "Similarity at which two chunks count as the same chunk."
+        },
+        {
+          "name": "threshold",
+          "type": "number",
+          "required": false,
+          "default": 0.5,
+          "description": "Score the answer must reach to pass."
+        }
+      ],
+      "calls_model": false,
+      "cost": "free"
+    },
+    {
+      "id": "no_pii",
+      "kind": "output_grader",
+      "name": "No PII",
+      "checks": "Fails when the answer matches any selected PII pattern, using a conservative regex subset with checksum-valid cards and IBANs and international phone numbers only, not Presidio. In a recorded answer, an email or card number the capture redacted counts as found.",
+      "category": "safety",
+      "inputs": [
+        "output"
+      ],
+      "options": [
+        {
+          "name": "entities",
+          "type": "array",
+          "required": false,
+          "description": "Entity kinds to look for; absent means all seven, and an unknown name fails closed."
+        }
+      ],
+      "calls_model": false,
+      "cost": "free"
+    },
+    {
+      "id": "localization_f1",
+      "kind": "output_grader",
+      "name": "Localization F1",
+      "checks": "Scores cited files and line ranges against a gold localization set; file-level F1 and mean line-range overlap must both clear their thresholds.",
+      "category": "retrieval",
+      "inputs": [
+        "output",
+        "expected"
+      ],
+      "options": [
+        {
+          "name": "reference",
+          "type": "any",
+          "required": false,
+          "description": "The gold localization set. The TypeScript grader object carries it here; the Python grade service reads the case reference instead."
+        },
+        {
+          "name": "threshold",
+          "type": "number",
+          "required": false,
+          "default": 0.5,
+          "description": "Default threshold for both figures."
+        },
+        {
+          "name": "file_threshold",
+          "type": "number",
+          "required": false,
+          "description": "File-level F1 the answer must reach; defaults to threshold."
+        },
+        {
+          "name": "line_threshold",
+          "type": "number",
+          "required": false,
+          "description": "Mean line-range overlap the answer must reach; defaults to threshold."
+        }
+      ],
+      "calls_model": false,
+      "cost": "free"
+    },
+    {
+      "id": "custom_webhook",
+      "kind": "output_grader",
+      "name": "Custom webhook",
+      "checks": "Posts the answer to your endpoint — the url is SSRF-checked before the call and redirects are refused, not followed — and takes the verdict from a system Caveman does not control; a blocked url, a redirect, a transport error or a missing verdict fails.",
+      "category": "external",
+      "inputs": [
+        "output"
+      ],
+      "options": [
+        {
+          "name": "url",
+          "type": "string",
+          "required": true,
+          "description": "Endpoint that receives the answer and returns {\"passed\": bool, \"reason\": string}."
+        },
+        {
+          "name": "timeout_s",
+          "type": "number",
+          "required": false,
+          "default": 5,
+          "description": "Request timeout on the Python grade service; the TypeScript package uses its injected fetch instead."
+        }
+      ],
+      "extra_options": true,
+      "calls_model": false,
+      "cost": "external_call"
+    },
+    {
+      "id": "llm_judge",
+      "kind": "question",
+      "name": "LLM judge",
+      "checks": "Asks the project's judge whether the answer meets a rubric; an answer the judge is not sure of is inconclusive, never a pass or a fail.",
+      "category": "judge",
+      "inputs": [
+        "output"
+      ],
+      "options": [
+        {
+          "name": "rubric",
+          "type": "string",
+          "required": true,
+          "description": "What the judge should check."
+        },
+        {
+          "name": "gateway_url",
+          "type": "string",
+          "required": false,
+          "description": "Caveman gateway base URL the judge call goes through; the TypeScript package fails closed without it, the Python service falls back to $CAVE_GATEWAY_URL."
+        },
+        {
+          "name": "model",
+          "type": "string",
+          "required": false,
+          "default": "gpt-5.5",
+          "description": "Judge model; pin it for any gate that uses a judge."
+        },
+        {
+          "name": "api_key",
+          "type": "string",
+          "required": false,
+          "description": "Project gateway key for the judge call. Required: a judge never falls back to a service credential."
+        },
+        {
+          "name": "upstream_key",
+          "type": "string",
+          "required": false,
+          "description": "Upstream provider key forwarded to the gateway; leave unset to use the project's stored provider credential."
+        },
+        {
+          "name": "subject_model",
+          "type": "string",
+          "required": false,
+          "description": "Model that produced the answer; the bias guard fails closed when it shares a family with the judge. The TypeScript package takes this from GradeDeps rather than options."
+        },
+        {
+          "name": "timeout_s",
+          "type": "number",
+          "required": false,
+          "default": 15,
+          "description": "Judge-call timeout on the Python grade service; the TypeScript package uses its injected fetch instead."
+        }
+      ],
+      "calls_model": true,
+      "cost": "judge_call"
+    },
+    {
+      "id": "llm_score",
+      "kind": "question",
+      "name": "LLM score",
+      "checks": "Asks the project's judge to place the answer on a five-level scale against a rubric and passes when the score, from 0 to 1, reaches min_score.",
+      "category": "judge",
+      "inputs": [
+        "output"
+      ],
+      "options": [
+        {
+          "name": "rubric",
+          "type": "string",
+          "required": true,
+          "description": "What the judge should score against."
+        },
+        {
+          "name": "min_score",
+          "type": "number",
+          "required": true,
+          "description": "Score the answer must reach; the comparison is inclusive and runs on the unrounded value."
+        },
+        {
+          "name": "gateway_url",
+          "type": "string",
+          "required": false,
+          "description": "Caveman gateway base URL the judge call goes through; the TypeScript package fails closed without it, the Python service falls back to $CAVE_GATEWAY_URL."
+        },
+        {
+          "name": "model",
+          "type": "string",
+          "required": false,
+          "default": "gpt-5.5",
+          "description": "Judge model; pin it for any gate that uses a judge."
+        },
+        {
+          "name": "api_key",
+          "type": "string",
+          "required": false,
+          "description": "Project gateway key for the judge call. Required: a judge never falls back to a service credential."
+        },
+        {
+          "name": "upstream_key",
+          "type": "string",
+          "required": false,
+          "description": "Upstream provider key forwarded to the gateway; leave unset to use the project's stored provider credential."
+        },
+        {
+          "name": "subject_model",
+          "type": "string",
+          "required": false,
+          "description": "Model that produced the answer; the bias guard fails closed when it shares a family with the judge. The TypeScript package takes this from GradeDeps rather than options."
+        },
+        {
+          "name": "timeout_s",
+          "type": "number",
+          "required": false,
+          "default": 15,
+          "description": "Judge-call timeout on the Python grade service; the TypeScript package uses its injected fetch instead."
+        }
+      ],
+      "calls_model": true,
+      "cost": "judge_call"
+    },
+    {
+      "id": "llm_category",
+      "kind": "question",
+      "name": "LLM category",
+      "checks": "Asks the project's judge to put the answer in exactly one of your categories and passes when that category is one of the passing ones.",
+      "category": "judge",
+      "inputs": [
+        "output"
+      ],
+      "options": [
+        {
+          "name": "prompt",
+          "type": "string",
+          "required": true,
+          "description": "How the judge should classify the answer."
+        },
+        {
+          "name": "categories",
+          "type": "array",
+          "required": true,
+          "description": "The full category list, unique case-insensitively; the prompt lists them joined with a comma and a space."
+        },
+        {
+          "name": "passing_categories",
+          "type": "array",
+          "required": true,
+          "description": "Categories that count as a pass; every entry must be one of categories."
+        },
+        {
+          "name": "gateway_url",
+          "type": "string",
+          "required": false,
+          "description": "Caveman gateway base URL the judge call goes through; the TypeScript package fails closed without it, the Python service falls back to $CAVE_GATEWAY_URL."
+        },
+        {
+          "name": "model",
+          "type": "string",
+          "required": false,
+          "default": "gpt-5.5",
+          "description": "Judge model; pin it for any gate that uses a judge."
+        },
+        {
+          "name": "api_key",
+          "type": "string",
+          "required": false,
+          "description": "Project gateway key for the judge call. Required: a judge never falls back to a service credential."
+        },
+        {
+          "name": "upstream_key",
+          "type": "string",
+          "required": false,
+          "description": "Upstream provider key forwarded to the gateway; leave unset to use the project's stored provider credential."
+        },
+        {
+          "name": "subject_model",
+          "type": "string",
+          "required": false,
+          "description": "Model that produced the answer; the bias guard fails closed when it shares a family with the judge. The TypeScript package takes this from GradeDeps rather than options."
+        },
+        {
+          "name": "timeout_s",
+          "type": "number",
+          "required": false,
+          "default": 15,
+          "description": "Judge-call timeout on the Python grade service; the TypeScript package uses its injected fetch instead."
+        }
+      ],
+      "calls_model": true,
+      "cost": "judge_call"
+    },
+    {
+      "id": "llm_pairwise",
+      "kind": "question",
+      "name": "LLM pairwise",
+      "checks": "Asks the project's judge to compare the answer against a baseline in both orders, two judge calls, and passes only when the baseline wins neither.",
+      "category": "judge",
+      "inputs": [
+        "question",
+        "output",
+        "baseline"
+      ],
+      "options": [
+        {
+          "name": "baseline",
+          "type": "string",
+          "required": true,
+          "description": "The response the answer is compared against."
+        },
+        {
+          "name": "criteria",
+          "type": "string",
+          "required": true,
+          "description": "What makes one response better than the other."
+        },
+        {
+          "name": "gateway_url",
+          "type": "string",
+          "required": false,
+          "description": "Caveman gateway base URL the judge call goes through; the TypeScript package fails closed without it, the Python service falls back to $CAVE_GATEWAY_URL."
+        },
+        {
+          "name": "model",
+          "type": "string",
+          "required": false,
+          "default": "gpt-5.5",
+          "description": "Judge model; pin it for any gate that uses a judge."
+        },
+        {
+          "name": "api_key",
+          "type": "string",
+          "required": false,
+          "description": "Project gateway key for the judge call. Required: a judge never falls back to a service credential."
+        },
+        {
+          "name": "upstream_key",
+          "type": "string",
+          "required": false,
+          "description": "Upstream provider key forwarded to the gateway; leave unset to use the project's stored provider credential."
+        },
+        {
+          "name": "subject_model",
+          "type": "string",
+          "required": false,
+          "description": "Model that produced the answer; the bias guard fails closed when it shares a family with the judge. The TypeScript package takes this from GradeDeps rather than options."
+        },
+        {
+          "name": "timeout_s",
+          "type": "number",
+          "required": false,
+          "default": 15,
+          "description": "Judge-call timeout on the Python grade service; the TypeScript package uses its injected fetch instead."
+        }
+      ],
+      "calls_model": true,
+      "cost": "two_judge_calls"
+    },
+    {
+      "id": "llm_answer_match",
+      "kind": "question",
+      "name": "LLM answer match",
+      "checks": "Asks the project's judge whether the answer conveys the same answer as the expected one, ignoring wording and formatting.",
+      "category": "judge",
+      "inputs": [
+        "output",
+        "expected"
+      ],
+      "options": [
+        {
+          "name": "expected",
+          "type": "string",
+          "required": false,
+          "description": "The answer the response should convey. The TypeScript grader object carries it here; the Python grade service falls back to the case reference when this option is unset, so a suite that sets neither fails closed."
+        },
+        {
+          "name": "gateway_url",
+          "type": "string",
+          "required": false,
+          "description": "Caveman gateway base URL the judge call goes through; the TypeScript package fails closed without it, the Python service falls back to $CAVE_GATEWAY_URL."
+        },
+        {
+          "name": "model",
+          "type": "string",
+          "required": false,
+          "default": "gpt-5.5",
+          "description": "Judge model; pin it for any gate that uses a judge."
+        },
+        {
+          "name": "api_key",
+          "type": "string",
+          "required": false,
+          "description": "Project gateway key for the judge call. Required: a judge never falls back to a service credential."
+        },
+        {
+          "name": "upstream_key",
+          "type": "string",
+          "required": false,
+          "description": "Upstream provider key forwarded to the gateway; leave unset to use the project's stored provider credential."
+        },
+        {
+          "name": "subject_model",
+          "type": "string",
+          "required": false,
+          "description": "Model that produced the answer; the bias guard fails closed when it shares a family with the judge. The TypeScript package takes this from GradeDeps rather than options."
+        },
+        {
+          "name": "timeout_s",
+          "type": "number",
+          "required": false,
+          "default": 15,
+          "description": "Judge-call timeout on the Python grade service; the TypeScript package uses its injected fetch instead."
+        }
+      ],
+      "calls_model": true,
+      "cost": "judge_call"
+    },
+    {
+      "id": "called_tool",
+      "kind": "assertion",
+      "name": "Called a tool",
+      "checks": "Passes when the tool was called, with the arguments and result asked for when those are given.",
+      "category": "trajectory",
+      "inputs": [
+        "steps"
+      ],
+      "options": [
+        {
+          "name": "tool",
+          "type": "string",
+          "required": true,
+          "description": "The tool's name, as the trace records it."
+        },
+        {
+          "name": "input",
+          "type": "object",
+          "required": false,
+          "description": "Arguments the call must carry: a partial object, matched key by key."
+        },
+        {
+          "name": "output",
+          "type": "any",
+          "required": false,
+          "description": "What the result must hold: a string the result contains, or a JSON object or array the result matches."
+        },
+        {
+          "name": "is_error",
+          "type": "boolean",
+          "required": false,
+          "description": "Whether the call must have failed (true) or succeeded (false)."
+        },
+        {
+          "name": "times",
+          "type": "integer",
+          "required": false,
+          "description": "Exactly how many matching calls there must be. Left out: at least one."
+        }
+      ],
+      "calls_model": false,
+      "cost": "free"
+    },
+    {
+      "id": "not_called_tool",
+      "kind": "assertion",
+      "name": "Never called a tool",
+      "checks": "Fails when the tool was called at all, naming each call.",
+      "category": "trajectory",
+      "inputs": [
+        "steps"
+      ],
+      "options": [
+        {
+          "name": "tool",
+          "type": "string",
+          "required": true,
+          "description": "The tool's name, as the trace records it."
+        }
+      ],
+      "calls_model": false,
+      "cost": "free"
+    },
+    {
+      "id": "tool_order",
+      "kind": "assertion",
+      "name": "Tools in order",
+      "checks": "Passes when the tools were called in this order; other calls may come between.",
+      "category": "trajectory",
+      "inputs": [
+        "steps"
+      ],
+      "options": [
+        {
+          "name": "tools",
+          "type": "array",
+          "required": true,
+          "description": "Tool names, first to last."
+        }
+      ],
+      "calls_model": false,
+      "cost": "free"
+    },
+    {
+      "id": "max_tool_calls",
+      "kind": "assertion",
+      "name": "At most N tool calls",
+      "checks": "Fails when more tool calls were made than the limit, naming the calls past it.",
+      "category": "trajectory",
+      "inputs": [
+        "steps"
+      ],
+      "options": [
+        {
+          "name": "max",
+          "type": "integer",
+          "required": true,
+          "description": "The most calls allowed."
+        },
+        {
+          "name": "tool",
+          "type": "string",
+          "required": false,
+          "description": "Count only this tool's calls. Left out: every tool call."
+        }
+      ],
+      "calls_model": false,
+      "cost": "free"
+    },
+    {
+      "id": "used_no_tools",
+      "kind": "assertion",
+      "name": "Used no tools",
+      "checks": "Fails when any tool was called.",
+      "category": "trajectory",
+      "inputs": [
+        "steps"
+      ],
+      "options": [],
+      "calls_model": false,
+      "cost": "free"
+    },
+    {
+      "id": "trajectory_match",
+      "kind": "assertion",
+      "name": "Trajectory matches a reference",
+      "checks": "Compares the tool calls made with a reference list of calls.",
+      "category": "trajectory",
+      "inputs": [
+        "steps"
+      ],
+      "options": [
+        {
+          "name": "mode",
+          "type": "string",
+          "required": true,
+          "enum": [
+            "strict",
+            "unordered",
+            "subset",
+            "superset"
+          ],
+          "description": "strict: the same calls in the same order. unordered: the same calls in any order. subset: only calls from the reference. superset: at least the reference's calls."
+        },
+        {
+          "name": "reference",
+          "type": "array",
+          "required": false,
+          "description": "The reference calls, in order."
+        },
+        {
+          "name": "args_mode",
+          "type": "string",
+          "required": false,
+          "default": "exact",
+          "enum": [
+            "exact",
+            "ignore",
+            "subset",
+            "superset"
+          ],
+          "description": "How a call's arguments compare with the reference's: exact equality, ignore (name only), subset (the call's keys within the reference's) or superset (the reference's keys within the call's)."
+        },
+        {
+          "name": "args_overrides",
+          "type": "object",
+          "required": false,
+          "description": "An argument mode per tool name, in place of args_mode."
+        }
+      ],
+      "calls_model": false,
+      "cost": "free"
+    },
+    {
+      "id": "loop",
+      "kind": "assertion",
+      "name": "No loop",
+      "checks": "Fails when a tool was called with the same arguments this many times or more.",
+      "category": "trajectory",
+      "inputs": [
+        "steps"
+      ],
+      "options": [
+        {
+          "name": "min_repeats",
+          "type": "integer",
+          "required": true,
+          "description": "How many identical calls make a loop."
+        },
+        {
+          "name": "tool",
+          "type": "string",
+          "required": false,
+          "description": "Look at this tool only. Left out: every tool."
+        }
+      ],
+      "calls_model": false,
+      "cost": "free"
+    },
+    {
+      "id": "error_unhandled",
+      "kind": "assertion",
+      "name": "No unhandled error",
+      "checks": "Fails when a tool call failed and the agent neither retried it nor answered the failure.",
+      "category": "trajectory",
+      "inputs": [
+        "steps"
+      ],
+      "options": [],
+      "calls_model": false,
+      "cost": "free"
+    },
+    {
+      "id": "budget",
+      "kind": "assertion",
+      "name": "Within budget",
+      "checks": "Fails when the unit's cost, tokens, latency or turns pass the limit, naming the step at which it crossed.",
+      "category": "trajectory",
+      "inputs": [
+        "steps"
+      ],
+      "options": [
+        {
+          "name": "metric",
+          "type": "string",
+          "required": true,
+          "enum": [
+            "cost_usd",
+            "tokens",
+            "latency_ms",
+            "turns"
+          ],
+          "description": "cost_usd and tokens are the model calls' own; latency_ms is wall clock from the first step's start to the last step's end; turns counts model turns."
+        },
+        {
+          "name": "max",
+          "type": "number",
+          "required": true,
+          "description": "The limit. A whole number for tokens and turns."
+        },
+        {
+          "name": "per",
+          "type": "string",
+          "required": false,
+          "enum": [
+            "trace",
+            "task"
+          ],
+          "description": "Count per trace of a task, or over the whole task. Left out: the whole unit."
+        }
+      ],
+      "calls_model": false,
+      "cost": "free"
+    },
+    {
+      "id": "code",
+      "kind": "code",
+      "name": "Code",
+      "checks": "Your own Python, JavaScript or TypeScript receives the unit and returns a verdict or a score with a reason. It runs in a sandbox with no network.",
+      "category": "code",
+      "inputs": [
+        "question",
+        "output",
+        "expected",
+        "steps"
+      ],
+      "options": [
+        {
+          "name": "runtime",
+          "type": "string",
+          "required": true,
+          "enum": [
+            "python",
+            "javascript",
+            "typescript"
+          ],
+          "description": "The language the source is written in."
+        },
+        {
+          "name": "source",
+          "type": "string",
+          "required": true,
+          "description": "The code: it declares evaluate(unit)."
+        },
+        {
+          "name": "min_score",
+          "type": "number",
+          "required": false,
+          "default": 0.5,
+          "description": "A returned score passes from this up."
+        }
+      ],
+      "calls_model": false,
+      "cost": "sandbox"
+    }
+  ],
+  "templates": [
+    {
+      "id": "faithfulness",
+      "name": "Faithful to the context",
+      "checks": "Passes when every factual claim in the answer is supported by the retrieved context; fails when one is not, even if it is true.",
+      "inputs": [
+        "output",
+        "context"
+      ],
+      "statement": "Every factual claim in the answer is supported by the retrieved context.",
+      "pass_def": "Each claim is stated in the retrieved passages or follows directly from them. Saying the context does not hold the answer also passes.",
+      "fail_def": "At least one claim is absent from the retrieved passages or contradicts them, whether or not it is true.",
+      "na_def": "No retrieved context is shown, or the answer makes no factual claim.",
+      "example": {
+        "question": "How long do I have to ask for a refund on an annual plan?",
+        "context": [
+          "Annual plans can be refunded within 30 days of purchase.",
+          "Monthly plans are not refundable."
+        ],
+        "output": "You can get a refund on an annual plan within 60 days.",
+        "verdict": "failed",
+        "why": "The context says 30 days; 60 days appears in no passage."
+      }
+    },
+    {
+      "id": "context_relevance",
+      "name": "Context is relevant",
+      "checks": "Passes when the retrieved context holds what the question asks for; fails when retrieval brought back something else.",
+      "inputs": [
+        "question",
+        "context"
+      ],
+      "statement": "The retrieved context holds the information needed to answer the question.",
+      "pass_def": "At least one retrieved passage holds the fact or instruction the question asks for.",
+      "fail_def": "No retrieved passage holds it: the passages are about something else or stop short of what was asked.",
+      "na_def": "No retrieved context or no question is shown.",
+      "example": {
+        "question": "How long do I have to ask for a refund on an annual plan?",
+        "context": [
+          "Invoices are sent on the first day of each month.",
+          "Annual plans are billed once a year."
+        ],
+        "output": "Annual plans are billed once a year.",
+        "verdict": "failed",
+        "why": "Both passages are about billing; neither says how long a refund can be asked for."
+      }
+    },
+    {
+      "id": "answer_relevance",
+      "name": "Answers the question",
+      "checks": "Passes when the answer addresses what was asked; fails when it answers something else, dodges or stops short.",
+      "inputs": [
+        "question",
+        "output"
+      ],
+      "statement": "The answer addresses the question that was asked.",
+      "pass_def": "It responds to the question directly and covers what was asked. Saying it cannot answer, and why, also passes.",
+      "fail_def": "It answers a different question, dodges, or leaves out part of what was asked.",
+      "na_def": "No question is shown.",
+      "example": {
+        "question": "How long do I have to ask for a refund on an annual plan?",
+        "context": [
+          "Annual plans can be refunded within 30 days of purchase."
+        ],
+        "output": "Annual plans are our best value and include priority support.",
+        "verdict": "failed",
+        "why": "The answer is about the plan's value; it never says how long a refund can be asked for."
+      }
+    },
+    {
+      "id": "cites_sources",
+      "name": "Cites its sources",
+      "checks": "Passes when every factual claim in the answer cites a retrieved passage that supports it; fails on a missing, invented or wrong citation.",
+      "inputs": [
+        "output",
+        "context"
+      ],
+      "statement": "Every factual claim in the answer cites a retrieved passage that supports it.",
+      "pass_def": "Each claim carries a citation (a marker, a title or a link) to a retrieved passage, and that passage supports the claim.",
+      "fail_def": "A claim has no citation, cites something that was not retrieved, or cites a passage that does not support it.",
+      "na_def": "No retrieved context is shown, or the answer makes no factual claim.",
+      "example": {
+        "question": "How long do I have to ask for a refund on an annual plan?",
+        "context": [
+          "[1] Annual plans can be refunded within 30 days of purchase.",
+          "[2] Monthly plans are not refundable."
+        ],
+        "output": "Annual plans can be refunded within 30 days of purchase [1].",
+        "verdict": "passed",
+        "why": "The one claim cites passage 1, which was retrieved and says the same."
+      }
+    },
+    {
+      "id": "task_completed",
+      "name": "Task completed",
+      "checks": "Passes when the answer shows the task it was given done; fails when it gave up, looped, or says it succeeded without doing it.",
+      "inputs": [
+        "question",
+        "output"
+      ],
+      "statement": "The agent completed the task it was given.",
+      "pass_def": "The answer shows the task done, or says plainly that it cannot be done and why.",
+      "fail_def": "It gave up, looped, did part of the task, or declared success for something it did not do.",
+      "na_def": "No task is asked of the agent in this unit.",
+      "example": {
+        "question": "Move my Tuesday 3pm meeting with Dana to Thursday at the same time.",
+        "context": [],
+        "output": "Thursday at 3pm is free on your calendar.",
+        "verdict": "failed",
+        "why": "It checked Thursday but never moved the meeting, and does not say why."
+      }
+    },
+    {
+      "id": "follows_instructions",
+      "name": "Follows instructions",
+      "checks": "Passes when the answer keeps every rule the system prompt sets; fails when it breaks one: format, scope, tone or a refusal it was told to make.",
+      "inputs": [
+        "question",
+        "output"
+      ],
+      "statement": "The answer follows the instructions in the system prompt.",
+      "pass_def": "No stated instruction is broken.",
+      "fail_def": "It breaks a stated rule: the format, the scope, the tone, the language, or a refusal it was told to make.",
+      "na_def": "The request carries no instructions for the agent.",
+      "example": {
+        "question": "System: Answer in English, in at most two sentences. User: ¿A qué hora abre la tienda?",
+        "context": [],
+        "output": "La tienda abre a las 9 de la mañana.",
+        "verdict": "failed",
+        "why": "The system prompt asks for English; the answer is in Spanish."
+      }
+    },
+    {
+      "id": "fair_refusals",
+      "name": "Refuses only what it should",
+      "checks": "Passes when the agent helps with what it may help with and declines only what it must; fails on a needless refusal or on help it should have withheld.",
+      "inputs": [
+        "question",
+        "output"
+      ],
+      "statement": "The agent declines only requests it should decline, and helps with the rest.",
+      "pass_def": "It helps with an allowed request, or declines a request its instructions or safety rule out and says so.",
+      "fail_def": "It refuses or deflects an ordinary request it could have answered, or helps with one its instructions rule out.",
+      "na_def": "Nothing in the request is a question of whether to help.",
+      "example": {
+        "question": "How do I reset my password?",
+        "context": [],
+        "output": "I'm sorry, I can't help with account security questions.",
+        "verdict": "failed",
+        "why": "Resetting a password is a routine request the agent should walk the person through."
+      }
+    },
+    {
+      "id": "no_frustration",
+      "name": "No customer frustration",
+      "checks": "Passes when the person stays neutral or satisfied; fails when they sound frustrated, repeat the same request, or ask for a person.",
+      "inputs": [
+        "question"
+      ],
+      "statement": "The customer does not sound frustrated.",
+      "pass_def": "The customer is neutral or satisfied throughout.",
+      "fail_def": "The customer sounds frustrated, repeats the same request, or asks for a person.",
+      "na_def": "No customer speaks in this unit.",
+      "example": {
+        "question": "User: My refund still hasn't arrived. User: I asked about this yesterday too. Can I just talk to a person?",
+        "context": [],
+        "output": "Refunds take 5 to 7 business days.",
+        "verdict": "failed",
+        "why": "The person repeats a request from the day before and asks for a human."
+      }
+    }
+  ]
+}

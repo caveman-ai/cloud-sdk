@@ -1,0 +1,47 @@
+Caveman Sandboxes are isolated Firecracker microVMs managed with an organization `code:run` key. Paused sandboxes keep their disk and cost nothing while asleep.
+
+## CLI
+
+```bash
+export CAVE_TOKEN=cave_live_...
+cvm sandbox create --name scratch --size 2cpu-4gb --sleep-after 10m
+cvm sandbox exec SANDBOX_ID -- uname -a
+cvm sandbox cp ./run.sh SANDBOX_ID:/home/user/
+cvm sandbox port-forward SANDBOX_ID 8080
+cvm sandbox url SANDBOX_ID 3000
+cvm sandbox snapshot SANDBOX_ID --name clean
+cvm sandbox fork SANDBOX_ID SNAPSHOT_ID --name try-2
+cvm sandbox sleep SANDBOX_ID
+cvm sandbox delete SANDBOX_ID --yes
+```
+
+## TypeScript
+
+```ts
+import { Sandboxes } from "@caveman-ai/sdk/sandboxes";
+
+const sandboxes = new Sandboxes({ controlURL: "https://api.caveman.so", apiKey: process.env.CAVE_TOKEN! });
+const sb = await sandboxes.create({ name: "scratch" });
+const res = await sb.exec(["uname", "-a"]);
+await sb.sleep();
+await sb.delete();
+```
+
+## Python
+
+```python
+from caveman_cloud import Sandboxes
+
+sandboxes = Sandboxes(control_url="https://api.caveman.so", api_key=os.environ["CAVE_TOKEN"])
+sb = sandboxes.create(name="scratch")
+res = sb.exec(["uname", "-a"])
+sb.delete()
+```
+
+## Go
+
+```go
+client, _ := caveman.NewSandboxes(caveman.SandboxesConfig{ControlURL: "https://api.caveman.so", APIKey: os.Getenv("CAVE_TOKEN")})
+sb, _ := client.Create(ctx, caveman.CreateSandboxInput{Name: "scratch"})
+defer client.Delete(ctx, sb.ID)
+```

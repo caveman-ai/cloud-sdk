@@ -1,0 +1,2336 @@
+{
+  "alerts.create": {
+    "scope": "project",
+    "version": "1",
+    "contract": "bdb1010a904c33826bb9b1d65651ca071d934195518f05e848dae9eeed708ae0",
+    "transactional": false
+  },
+  "alerts.delete": {
+    "scope": "project",
+    "version": "1",
+    "contract": "de0fa88b380619cf8f18134fec4f716c8db3b1898798f8acb24e7f4e95e9c9c2",
+    "transactional": false
+  },
+  "alerts.list": {
+    "scope": "project",
+    "version": "1",
+    "contract": "9ada057b7a596e6938006a1f47f5321c502c66391aba764dec71396c7c4ade70",
+    "transactional": false
+  },
+  "alerts.update": {
+    "scope": "project",
+    "version": "1",
+    "contract": "30a5e275a9e4d0f8be5718d8c6afe2adec2caab7aef971b6f6a11b8226994599",
+    "transactional": false
+  },
+  "annotations.search": {
+    "scope": "project",
+    "version": "1",
+    "contract": "c51d817adf2575dbc8c0c14d7d465fa7824ad76fd66d198e26c9af7fb30423e3",
+    "transactional": false
+  },
+  "artifacts.get": {
+    "scope": "project",
+    "version": "1",
+    "contract": "267b47886d139cb40d10ff52827d8fd6c79eef361e25e1399677f8733df34e73",
+    "transactional": false
+  },
+  "artifacts.list": {
+    "scope": "project",
+    "version": "1",
+    "contract": "f2498bc09eef461f7e233fb15ec376790336a16ab8671eb968c7eab343042e84",
+    "transactional": false
+  },
+  "audit.list": {
+    "scope": "organization",
+    "version": "1",
+    "contract": "96ea9d2a4e7ed826c54366f912dabeb37465ec5f0655bbdd2b83eaaff171a3bd",
+    "transactional": false
+  },
+  "autoclimb.exclude": {
+    "scope": "project",
+    "version": "1",
+    "contract": "03e23ca9e19c5671eb7844208e92674ea527ffca5bb378e778b5c2775464fea1",
+    "transactional": false
+  },
+  "autoclimb.exclusions": {
+    "scope": "project",
+    "version": "1",
+    "contract": "0215bd054b795b5e5386e76e23da7c2bba515bed33d0879638bf27d1b794f8ad",
+    "transactional": false
+  },
+  "autoclimb.get": {
+    "scope": "project",
+    "version": "1",
+    "contract": "57aabe5798580df66377c73f8ba192ca3403d1c940eff41396b15d669072fcb5",
+    "transactional": false
+  },
+  "autoclimb.unexclude": {
+    "scope": "project",
+    "version": "1",
+    "contract": "f76f9b9f8bff28b99334677f9f7fa13fac96f100ddc7e9b4953757e673d8d688",
+    "transactional": false
+  },
+  "autoclimb.update": {
+    "scope": "project",
+    "version": "1",
+    "contract": "7286fd5eeabdbc7264b4b7964782ddfa83010d7911be3f0fadd1358309afe704",
+    "transactional": false
+  },
+  "autoclimb.workload": {
+    "scope": "project",
+    "version": "1",
+    "contract": "ffe96a2b50d557d6288e7ed795c977cc672fb30b50d9aa599eadb22bfb02c9cc",
+    "transactional": false
+  },
+  "autopilot.funding_get": {
+    "scope": "organization",
+    "version": "1",
+    "contract": "0a16e2a15245020e394bf006c15831b73353bcb8a82a31c6aa1e0b81d7b12b94",
+    "transactional": false
+  },
+  "autopilot.funding_set": {
+    "scope": "organization",
+    "version": "1",
+    "contract": "f53601012798a3619427bc9cd8483fe4f68c214bcdab152a414d1211557660bf",
+    "transactional": false
+  },
+  "autopilot.get": {
+    "scope": "project",
+    "version": "1",
+    "contract": "3f3b5fd735640ed789a19ef53a6be12af67b0328c7f0a3d1427c265d676b5b01",
+    "transactional": false
+  },
+  "autopilot.pause": {
+    "scope": "organization",
+    "version": "1",
+    "contract": "9c68dbf7343250a23a0b309f3c8770f6853a21d69f1a637bbe78035e948f2b8d",
+    "transactional": false
+  },
+  "autopilot.pause_status": {
+    "scope": "organization",
+    "version": "1",
+    "contract": "ec1867dcbbb38189c97ca2974a6fd2f9c63b67c9cf8f3d81ecfdec06af60d700",
+    "transactional": false
+  },
+  "autopilot.resume": {
+    "scope": "organization",
+    "version": "1",
+    "contract": "19dd995217ff032fdc8164e23081bf8cd1748c96973b66c27a21b8915b7d8863",
+    "transactional": false
+  },
+  "autopilot.set": {
+    "scope": "project",
+    "version": "1",
+    "contract": "ad78e146f05e1f20772c396341c8b3db02e324aa3feda2cc78b51e2b531e1a0e",
+    "transactional": false
+  },
+  "builds.evidence": {
+    "scope": "project",
+    "version": "1",
+    "contract": "f71ce1acefd179009e6bbc38789954bacda453748f5cfcf28efb655c2ac248ba",
+    "transactional": false
+  },
+  "builds.get": {
+    "scope": "project",
+    "version": "1",
+    "contract": "7d1faed0b9ccbf4256ed95b253fc8a4258e0162f820ae567fa8761afd5ca162f",
+    "transactional": false
+  },
+  "builds.list": {
+    "scope": "project",
+    "version": "1",
+    "contract": "15d04faacafc1adc4d5c3c392866be624eea8ec0027bfe9e0369195caa97c430",
+    "transactional": false
+  },
+  "builds.register": {
+    "scope": "project",
+    "version": "1",
+    "contract": "21a98fc3f56f140f86f0ae0a050918333b40449a07ec3b7ebc10dac5973f104b",
+    "transactional": false
+  },
+  "builds.regressions": {
+    "scope": "project",
+    "version": "1",
+    "contract": "1e907e8cdfdd61535ac15c2c4b81960a57bed6aa2c407207f65eecdb4f743e3d",
+    "transactional": false
+  },
+  "charts.catalog": {
+    "scope": "project",
+    "version": "1",
+    "contract": "014f278521da502d5765a676255a94e2d16e85e173befe103931817d1b469c6b",
+    "transactional": false
+  },
+  "charts.query": {
+    "scope": "project",
+    "version": "1",
+    "contract": "c524d95e78a148ecc6782e03411c54de7e291ccce4aba4e824582906d6526085",
+    "transactional": false
+  },
+  "charts.samples": {
+    "scope": "project",
+    "version": "1",
+    "contract": "003bb575b438d069124f5a94ebf40f4c8abb2f292c06ff96b75f3bced59ba076",
+    "transactional": false
+  },
+  "charts.values": {
+    "scope": "project",
+    "version": "1",
+    "contract": "c07e4a45791dac4f4f10a9c51188b3d6b96a1efdf63cf62acca297eec49b74a0",
+    "transactional": false
+  },
+  "ci.finish": {
+    "scope": "project",
+    "version": "1",
+    "contract": "962bd166cc75629655f16720f7171b5fde37116ce4474d8c47468a3dc086e1a2",
+    "transactional": false
+  },
+  "ci.set_checks": {
+    "scope": "project",
+    "version": "1",
+    "contract": "07618e486a449711e1488e9b90ed97ed711137fa3037ca3e465b2c85d80feac4",
+    "transactional": false
+  },
+  "ci.set_mode": {
+    "scope": "project",
+    "version": "1",
+    "contract": "c6100196f68933e57aa240cd07e1b6a17eaa3cdb564d20e6535252e9f53dbac9",
+    "transactional": false
+  },
+  "ci.start": {
+    "scope": "project",
+    "version": "1",
+    "contract": "c70bab039af16a1f381d42b32b5162d5a66800bc0156095368b2b24bc42a9cda",
+    "transactional": false
+  },
+  "ci.suites": {
+    "scope": "project",
+    "version": "1",
+    "contract": "13d83120d06dea03bcf83ad6846c03875998865a1255b1e737285a5281a3ed97",
+    "transactional": false
+  },
+  "computers.create": {
+    "scope": "project",
+    "version": "1",
+    "contract": "11dc2b123604c6922fb6042545daa4b1fda6a514534dc8a9cab69aa0a27a333b",
+    "transactional": false
+  },
+  "computers.delete": {
+    "scope": "project",
+    "version": "1",
+    "contract": "07e60734de2de24f8c7dd792be3182106f684929782df47b010b283d5a78d25a",
+    "transactional": false
+  },
+  "computers.delete_snapshot": {
+    "scope": "project",
+    "version": "1",
+    "contract": "a9265e5f6f4b9595d5cf2fb037562bc16b44f80f9a23133b4dce5bddfd6ba59a",
+    "transactional": false
+  },
+  "computers.fork_snapshot": {
+    "scope": "project",
+    "version": "1",
+    "contract": "d7338b40333c0e1b85a77f87affdfac9f88f6c8a07dd0199331130c3ffcb6403",
+    "transactional": false
+  },
+  "computers.get": {
+    "scope": "project",
+    "version": "1",
+    "contract": "cac6ebb209e7fdfffc8f0acd2bedcef2a5320a7771193b32ba0367f2311777e2",
+    "transactional": false
+  },
+  "computers.get_snapshot": {
+    "scope": "project",
+    "version": "1",
+    "contract": "378546a879b9b98acbe729464da59e8359ac7c405640f757994b4e0a93bc501a",
+    "transactional": false
+  },
+  "computers.list": {
+    "scope": "project",
+    "version": "1",
+    "contract": "9e19a7fda36c4bc6c60a34ef426bc49732dffb480d2eefb7dc18b3a62454a8fd",
+    "transactional": false
+  },
+  "computers.list_snapshots": {
+    "scope": "project",
+    "version": "1",
+    "contract": "695e2eb2ce25feaf7925579891b3afe4452bf3a37160238f4edb2a7b0e09a06d",
+    "transactional": false
+  },
+  "computers.restore_snapshot": {
+    "scope": "project",
+    "version": "1",
+    "contract": "61d909530c1eee17743c3a449eb344e9303c1549dd10496b78b886faa5dfde74",
+    "transactional": false
+  },
+  "computers.resume": {
+    "scope": "project",
+    "version": "1",
+    "contract": "ff010af638e0e46146d8456c94983aeb740e15861e1b5782ca131d896a8f8a90",
+    "transactional": false
+  },
+  "computers.sleep": {
+    "scope": "project",
+    "version": "1",
+    "contract": "a5169d1ec41c52e37aff07b0746ade5593d7387b2c64dd1da3639a613b96d8d9",
+    "transactional": false
+  },
+  "computers.take_snapshot": {
+    "scope": "project",
+    "version": "1",
+    "contract": "544513a202734f989b6210d795ab0ce6ac6362d67940cbb32e3948edb8e2cbb5",
+    "transactional": false
+  },
+  "consents.set_replay": {
+    "scope": "project",
+    "version": "1",
+    "contract": "b772060323ec109780298f1bb2784ec2c95d12c4ed6cf13d4ec6ef1104116e69",
+    "transactional": false
+  },
+  "context.data_source_catalog": {
+    "scope": "organization",
+    "version": "1",
+    "contract": "203b024984d3ca53049a976bdafe546519a0026dc4bf78806d126ca9d02b2fb7",
+    "transactional": false
+  },
+  "context.get_org": {
+    "scope": "organization",
+    "version": "1",
+    "contract": "6f1518c098e5b10aecb89c9ac692e43bf86c46214cc97ac4e39ad71bbfb3fabc",
+    "transactional": false
+  },
+  "context.get_semantic_cache": {
+    "scope": "project",
+    "version": "1",
+    "contract": "6b7a88afa2f43cb7c1bae6c52af51ee9dc4b77740b2709a7833238aaa1b4ae46",
+    "transactional": false
+  },
+  "context.provider_capabilities": {
+    "scope": "organization",
+    "version": "1",
+    "contract": "9ca3daf4d59ad0ad56e69ba62b6647ae25dec2b6200285f7d8286bd1284b1eea",
+    "transactional": false
+  },
+  "context.system_status": {
+    "scope": "organization",
+    "version": "1",
+    "contract": "3611ff02f9de6100fadf30d5bdedea3c4bb8eb270e93d66a61fd5cb92abc7dc3",
+    "transactional": false
+  },
+  "context.whoami": {
+    "scope": "organization",
+    "version": "1",
+    "contract": "02a93fce28e7dd0367159b6d27f86f63666c996f47b4f14e6949348fd7c23112",
+    "transactional": false
+  },
+  "criteria.catalog": {
+    "scope": "project",
+    "version": "1",
+    "contract": "93da781c03626c48234d70ececc53ce9aac730f989b39d7fd73212b74d97e850",
+    "transactional": false
+  },
+  "criteria.create": {
+    "scope": "project",
+    "version": "1",
+    "contract": "0cf08a82ccae25166504c0128f0bc89f302aa4a35f3d8acc3f356e3ee125d8f7",
+    "transactional": false
+  },
+  "criteria.edit": {
+    "scope": "project",
+    "version": "1",
+    "contract": "94b3357d85f30e1c986df6367bdb8c1fcf7ffd682f89d8dbb9473afb90785744",
+    "transactional": false
+  },
+  "criteria.get": {
+    "scope": "project",
+    "version": "1",
+    "contract": "1bd8105b9f3889f257dc9225a29c67456b2952ee2148ebb21714bbd63b1327ed",
+    "transactional": false
+  },
+  "criteria.list": {
+    "scope": "project",
+    "version": "1",
+    "contract": "5469f536db542ea008136002722aa64d604af4e930ea1574b058070b6b9f5d21",
+    "transactional": false
+  },
+  "criteria.propose": {
+    "scope": "project",
+    "version": "1",
+    "contract": "b35be6248c339b080813bcd6ad997c663fbc296b70d1d957a578560db39f684d",
+    "transactional": false
+  },
+  "criteria.restore_version": {
+    "scope": "project",
+    "version": "1",
+    "contract": "48c2484905e68931567b8b4d3a7f7c79a4eb62be82f94bbc442ccb50c30124ca",
+    "transactional": false
+  },
+  "criteria.skip": {
+    "scope": "project",
+    "version": "1",
+    "contract": "2c24be32ae7365f7e82627f7666dc67cb05a4b840f92b743222bc069ff608d9b",
+    "transactional": false
+  },
+  "criteria.test": {
+    "scope": "project",
+    "version": "1",
+    "contract": "33b18cfa12f380b249718f4c5e6368d69041689282246a14e2eb6c6d78638f71",
+    "transactional": false
+  },
+  "criteria.track": {
+    "scope": "project",
+    "version": "1",
+    "contract": "52f494571b086533f3080b2c0b9bbe9586e106a4e97f40db728fcd293606ca43",
+    "transactional": false
+  },
+  "criteria.trend": {
+    "scope": "project",
+    "version": "1",
+    "contract": "1e59c96a190ad2c5ae2e4198e2423efaea79adf5ef8a37c454e0aa5bbf39c869",
+    "transactional": false
+  },
+  "criteria.trust": {
+    "scope": "project",
+    "version": "1",
+    "contract": "d76bcd8fbfe83b35ba0063ffc586639e026a0ef6f19e49df2d259d710d76bbd0",
+    "transactional": false
+  },
+  "criteria.turn_on": {
+    "scope": "project",
+    "version": "1",
+    "contract": "c96e22e60cdaed805c0b2f76f56f16c2e3e8e8849ace338de214504882e30cb9",
+    "transactional": false
+  },
+  "criteria.versions": {
+    "scope": "project",
+    "version": "1",
+    "contract": "09d54d1af8634a94f59ce9f3a998ff76eae2c4ca128a4489f41e10b79cefaeae",
+    "transactional": false
+  },
+  "dashboards.add_chart": {
+    "scope": "project",
+    "version": "1",
+    "contract": "5f982a1c804aee5c42f2ddf82dcd13db72604c8f5a3fe26e328986e47736df7d",
+    "transactional": false
+  },
+  "dashboards.create": {
+    "scope": "project",
+    "version": "1",
+    "contract": "c5a28bf3d1180ef37bd86434b2c565ade81758198d1649ff71cf433d6fc3d9e9",
+    "transactional": false
+  },
+  "dashboards.delete": {
+    "scope": "project",
+    "version": "1",
+    "contract": "0d1b3997a3e5b9224231fd82a847e9e4a493f154c548948e069673b8d3af1e9c",
+    "transactional": false
+  },
+  "dashboards.delete_chart": {
+    "scope": "project",
+    "version": "1",
+    "contract": "9958dc69c51774605620e9540f92bd51267d7c2eaee47f7a455c9efb3b0b3913",
+    "transactional": false
+  },
+  "dashboards.get": {
+    "scope": "project",
+    "version": "1",
+    "contract": "bf0d04d58baf37bc5ab9848823be43f0d9f57fcbb8a433259054f4ac42a0b29c",
+    "transactional": false
+  },
+  "dashboards.list": {
+    "scope": "project",
+    "version": "1",
+    "contract": "58937abfbe34874048d99c0024c982bcebdc588a926fbd4efd7ea35fef1c60f4",
+    "transactional": false
+  },
+  "dashboards.update": {
+    "scope": "project",
+    "version": "1",
+    "contract": "197990cf8812da4364fd13f22fd51670e55d9ef9ec90ccd7a6689a0b3e218e9b",
+    "transactional": false
+  },
+  "dashboards.update_chart": {
+    "scope": "project",
+    "version": "1",
+    "contract": "a3fdf4b93acbbbd5953d845cb5f38f47caafc88fe7372f95e0140e231b6d57b6",
+    "transactional": false
+  },
+  "datasets.archive": {
+    "scope": "project",
+    "version": "1",
+    "contract": "13eb866e37a149fc46b6225a9aa6711d9cf9e98586ceb0a1bd299be5a63fc6ef",
+    "transactional": true
+  },
+  "datasets.create": {
+    "scope": "project",
+    "version": "1",
+    "contract": "ece37a703198f606ad5a25f35faefb993a3c18c40a9d60b0393a17fce2868d0d",
+    "transactional": true
+  },
+  "datasets.decide_proposal": {
+    "scope": "project",
+    "version": "1",
+    "contract": "6bae870c1adcbec476ee53eb2b7d70e0961d94f1a9d0a65c28d1f9e478216244",
+    "transactional": false
+  },
+  "datasets.diff": {
+    "scope": "project",
+    "version": "1",
+    "contract": "6959913dd22e63aed88dc1b4bc7d3f3643e9dbc6ee05c0e7046cd096e50b851b",
+    "transactional": false
+  },
+  "datasets.from_traffic": {
+    "scope": "project",
+    "version": "1",
+    "contract": "b8e0a2e20ffe504de2f57f32b5551575a11b8871f7f64c31e4edca7b8e9c4b41",
+    "transactional": false
+  },
+  "datasets.generate": {
+    "scope": "project",
+    "version": "1",
+    "contract": "ace6e16c1169e7b3c8ca87b181687d5a4dcba9a03a8d5b499209f919f028655d",
+    "transactional": false
+  },
+  "datasets.get": {
+    "scope": "project",
+    "version": "1",
+    "contract": "f19ddaaf9ac0a43dd4e6af6ccfe6f0db70b78217da2432cea3bc37a01ae34416",
+    "transactional": false
+  },
+  "datasets.import": {
+    "scope": "project",
+    "version": "1",
+    "contract": "e1e5238d47accafbf840a94ed994c74a889f61361928e5dfcca571c2ec60d75b",
+    "transactional": false
+  },
+  "datasets.list": {
+    "scope": "project",
+    "version": "1",
+    "contract": "df4c089a6973d4bc7545a4903a7e60c5462ce61019700f3cb2a5549eca7c35c3",
+    "transactional": false
+  },
+  "datasets.name_version": {
+    "scope": "project",
+    "version": "1",
+    "contract": "3b9575e39810f800ae118fa439fbe3ee566ddb85b7394b30f77dc8814e5d7002",
+    "transactional": false
+  },
+  "datasets.proposal": {
+    "scope": "project",
+    "version": "1",
+    "contract": "2a22032c6a3cb58bba4b64be000d89263d93a61853a4b2e8443c07794e310975",
+    "transactional": false
+  },
+  "datasets.proposals": {
+    "scope": "project",
+    "version": "1",
+    "contract": "15c3e30ae630da0ebe7b69caf075a8af5e9b8daec913ef355b1d0b4415fe5838",
+    "transactional": false
+  },
+  "datasets.restore": {
+    "scope": "project",
+    "version": "1",
+    "contract": "8ca3b1ca0e322c455f73a1b4cfb436e33cfd56746b797681222e614b891bd946",
+    "transactional": false
+  },
+  "datasets.rows_add": {
+    "scope": "project",
+    "version": "1",
+    "contract": "4f7ef06f8825396847fbed11a06f41939fd4271c59f1f0c8f7ad05cbbefdf709",
+    "transactional": false
+  },
+  "datasets.rows_delete": {
+    "scope": "project",
+    "version": "1",
+    "contract": "0295a841d1415808a26492e139adc6c84ee54f847e158f4bd7e0eaff1e8afe55",
+    "transactional": false
+  },
+  "datasets.rows_update": {
+    "scope": "project",
+    "version": "1",
+    "contract": "68db4457f09d2cbbbaa205ac1e86976047e817d65b7acf6fa5db656a8e5763e2",
+    "transactional": false
+  },
+  "datasets.snapshot": {
+    "scope": "project",
+    "version": "1",
+    "contract": "10fc4692f3c18d905b19cada050b0df262f45dcb29b11d41abb576cdc65ae3aa",
+    "transactional": true
+  },
+  "datasets.update": {
+    "scope": "project",
+    "version": "1",
+    "contract": "ef9265c434378cb879b708f85d918511e5268ca4c285bcdd52b4f6c741eef7b5",
+    "transactional": true
+  },
+  "datasets.version": {
+    "scope": "project",
+    "version": "1",
+    "contract": "dd3bfe449269ccc902062389878ee162eb4b9a4f36b7e99c1f51c7086e4121ac",
+    "transactional": false
+  },
+  "datasets.versions": {
+    "scope": "project",
+    "version": "1",
+    "contract": "e7a8d437767d9c13b872cad1971fefda0dbfee7eaecd86155b5f1da5a767841a",
+    "transactional": false
+  },
+  "eval_drafts.approve": {
+    "scope": "project",
+    "version": "1",
+    "contract": "775c941c250b45b57004fcceca22d4b7be4df23ac227d7c8de0ca7f666056006",
+    "transactional": false
+  },
+  "eval_drafts.decline": {
+    "scope": "project",
+    "version": "1",
+    "contract": "2a428d20c6e062a6a694a864d9e3694be81c27fcf787071a83420ada88e60de7",
+    "transactional": false
+  },
+  "eval_drafts.list": {
+    "scope": "project",
+    "version": "1",
+    "contract": "ff019be7770bf64e0959e8f62639ac52819de85872c4d498501c4bf65ab63105",
+    "transactional": false
+  },
+  "eval_drafts.request": {
+    "scope": "project",
+    "version": "1",
+    "contract": "964849168e02905345bcac6e45755fa88be8ef9d9275ffd120818257213b5d00",
+    "transactional": false
+  },
+  "evals.accept_proposal": {
+    "scope": "project",
+    "version": "1",
+    "contract": "2a8bf68ebcf4c05e818218dcc32a9193f6924b1d0de145650cec3e2bba3d8aa7",
+    "transactional": false
+  },
+  "evals.add_case": {
+    "scope": "project",
+    "version": "1",
+    "contract": "969a9b4a41ac23db10cfac8e685559a5d0182280453b563ef8f7aa57e4c98677",
+    "transactional": false
+  },
+  "evals.archive": {
+    "scope": "project",
+    "version": "1",
+    "contract": "ffe3c4130ef404e7ebb783216eb5786fd28d63e62293d6c1981b51bf2d197c0e",
+    "transactional": true
+  },
+  "evals.bulk_review": {
+    "scope": "project",
+    "version": "1",
+    "contract": "50c1936b7847112967baf6d5075895d42205787ff65f7c5921bed6ccf373e24f",
+    "transactional": false
+  },
+  "evals.cancel": {
+    "scope": "project",
+    "version": "1",
+    "contract": "2b11e9cac452df107ec9279ab1252fcb9d146a47dfd811864afe6e88abe95897",
+    "transactional": true
+  },
+  "evals.compare": {
+    "scope": "project",
+    "version": "1",
+    "contract": "ee85ea9d6d3543fe69fc1df575a60ab238523e34fd67a1d538e3e500dc0e3d7b",
+    "transactional": false
+  },
+  "evals.create": {
+    "scope": "project",
+    "version": "1",
+    "contract": "f3cb3c91e780dd78184572f95a2d830810f0da348cb4a5f33899bbdb44cfee57",
+    "transactional": true
+  },
+  "evals.create_suite": {
+    "scope": "project",
+    "version": "1",
+    "contract": "e27785e1a62f72eda9571389eb23d36f46f56efde4705bebd350b6163dc0e899",
+    "transactional": false
+  },
+  "evals.decline_proposal": {
+    "scope": "project",
+    "version": "1",
+    "contract": "d4d8f7a9d248e28680fb469b0ee2d0d445eddb7aa8a539da3dc07850ca70e566",
+    "transactional": false
+  },
+  "evals.edit_proposal": {
+    "scope": "project",
+    "version": "1",
+    "contract": "052c56234722135afe8714061bd6d87a73b4c60509f0c8ff181073229f6d92b9",
+    "transactional": false
+  },
+  "evals.estimate_run": {
+    "scope": "project",
+    "version": "1",
+    "contract": "073923ba78773d8829a3f0be13c7f83e65584ce3059d9bb4c5b1845423a82a48",
+    "transactional": false
+  },
+  "evals.get": {
+    "scope": "project",
+    "version": "1",
+    "contract": "bc9c7fb3325c73b3e342f2f600cfedc51f7b784b0775ad7c1a7e9772b9f6642e",
+    "transactional": false
+  },
+  "evals.get_baseline": {
+    "scope": "project",
+    "version": "1",
+    "contract": "ae0bbf01e315132e39b147f9bb4dc0ed44bcd2d8d2b735e7231bab9bdc8f1861",
+    "transactional": false
+  },
+  "evals.get_proposal": {
+    "scope": "project",
+    "version": "1",
+    "contract": "d8546689688565c6a9e44ea31969a8bf800d7356e06d2998d3eab9060e3aed95",
+    "transactional": false
+  },
+  "evals.get_suite": {
+    "scope": "project",
+    "version": "1",
+    "contract": "4859b6edf58523536afd42fa7751d48add007cf57743fce9d8e6986c21f642e0",
+    "transactional": false
+  },
+  "evals.ingest_evidence": {
+    "scope": "project",
+    "version": "1",
+    "contract": "999dd7ee98ff540525b0d2e94f11cc75293ff48ccfcc7158a48a40278b483307",
+    "transactional": false
+  },
+  "evals.list": {
+    "scope": "project",
+    "version": "1",
+    "contract": "8d7817bd99ad05f6f2567411b747e979b02d0d9b0b0acd023332436a1c7499b2",
+    "transactional": false
+  },
+  "evals.list_annotation_queue": {
+    "scope": "project",
+    "version": "1",
+    "contract": "e42d67afad56748f7b19eb9f850c3a596a1b49263f2c479530ec4550e0527b66",
+    "transactional": false
+  },
+  "evals.list_cases": {
+    "scope": "project",
+    "version": "1",
+    "contract": "598d2621fee126736ee8641603eae046977ab005355ba6087a969fd4b99afc18",
+    "transactional": false
+  },
+  "evals.list_evidence": {
+    "scope": "project",
+    "version": "1",
+    "contract": "6dcbc41de14fc14c1b1e4973533f7472c9e1978dcdc84caed5fdedc44424396f",
+    "transactional": false
+  },
+  "evals.list_experiments": {
+    "scope": "project",
+    "version": "1",
+    "contract": "975a803f4f742fbe2cf8a048353ae59f74884795878833afb148d2a84fa20203",
+    "transactional": false
+  },
+  "evals.list_proposals": {
+    "scope": "project",
+    "version": "1",
+    "contract": "9ff4236b38c60d8f5b11f127ef6a21175822ead28c920dc7c709950950924df4",
+    "transactional": false
+  },
+  "evals.list_run_annotations": {
+    "scope": "project",
+    "version": "1",
+    "contract": "277055a8884df9f65f2f07a603ac7f6468ac422477eccefa9b4651fc2467c186",
+    "transactional": false
+  },
+  "evals.list_suites": {
+    "scope": "project",
+    "version": "1",
+    "contract": "2eb5fd849e60497faad95b7ea13c59803bfcf8dec9deb3a526155287e54c178f",
+    "transactional": false
+  },
+  "evals.open_cell": {
+    "scope": "project",
+    "version": "1",
+    "contract": "9cf8e648db4da96d4cbe50d433574acc73ad3677a0c2166f70557c3762307a09",
+    "transactional": false
+  },
+  "evals.open_run": {
+    "scope": "project",
+    "version": "1",
+    "contract": "e391800447c8b908772facc2771f9615478e91c13434cdbac0855b60e033bf20",
+    "transactional": false
+  },
+  "evals.plan": {
+    "scope": "project",
+    "version": "1",
+    "contract": "c269c86a7988d1708178f042613f7cc667fefc3368dae2556b6e198b4739a464",
+    "transactional": false
+  },
+  "evals.propose": {
+    "scope": "project",
+    "version": "1",
+    "contract": "dd0f70d09340fc711812c1714d0da9a714d3e20cd0bb7bd4f46c5fd615408789",
+    "transactional": false
+  },
+  "evals.query_results": {
+    "scope": "project",
+    "version": "1",
+    "contract": "e7266324965c15e4f273460ae448f805d7657e9ab1e21c6c6ef078eb2bd74cd1",
+    "transactional": false
+  },
+  "evals.replace_cases": {
+    "scope": "project",
+    "version": "1",
+    "contract": "39722b8bb1d055e0f8a92d69079f16962498d63b2b69b0ddc48dd11f45041822",
+    "transactional": false
+  },
+  "evals.restore": {
+    "scope": "project",
+    "version": "1",
+    "contract": "056f330c56169444d85010b059b352eb664abb1e64385328a7214fd158580521",
+    "transactional": true
+  },
+  "evals.result": {
+    "scope": "project",
+    "version": "1",
+    "contract": "9d4ccd8b91b38c6960f3cc4dae2e9744dbd21061cf26622594db9044747767fe",
+    "transactional": false
+  },
+  "evals.run": {
+    "scope": "project",
+    "version": "1",
+    "contract": "bd454d9b3bf665576272d817904ef13b7f011a3dd7b4f85f14f02fd96ad41463",
+    "transactional": true
+  },
+  "evals.run_baseline": {
+    "scope": "project",
+    "version": "1",
+    "contract": "fbeae0cd4c21244ea41e91854d6ec4836449567e02eaaaeb80e89cb87b4e9bc3",
+    "transactional": false
+  },
+  "evals.runs": {
+    "scope": "project",
+    "version": "1",
+    "contract": "308cc9713c4b24c4b5b6335302ea590de0551a9ab4b6bab1a603aaf2ed80c159",
+    "transactional": false
+  },
+  "evals.set_baseline": {
+    "scope": "project",
+    "version": "1",
+    "contract": "e2994c27e068dd5165b0dcb61fda7d8f27e4635bb905cd249292230f44773ce9",
+    "transactional": false
+  },
+  "evals.set_review_schema": {
+    "scope": "project",
+    "version": "1",
+    "contract": "a3a4ea0abab88add417ccc74d03252602cbce193f0d79f283eb3e05bbc664526",
+    "transactional": false
+  },
+  "evals.snapshot": {
+    "scope": "project",
+    "version": "1",
+    "contract": "6df794637edd3cba08950b8cde80037de13dc2eadde07a80d6a3d8fb575b1f3f",
+    "transactional": true
+  },
+  "evals.update": {
+    "scope": "project",
+    "version": "1",
+    "contract": "92d55e5e51d09611ce2d974c28c556dd436f87484ba7301a2913e5a819b712c1",
+    "transactional": true
+  },
+  "evals.update_suite": {
+    "scope": "project",
+    "version": "1",
+    "contract": "812c12b8a1387445abc31c1ada470bb733d246177bf5b419ab89d49cedc5e303",
+    "transactional": false
+  },
+  "evaluators.archive": {
+    "scope": "project",
+    "version": "1",
+    "contract": "989baa35dbdb83b668485499c8db8341e7c552a10dc77d1fbad5b57953549a89",
+    "transactional": true
+  },
+  "evaluators.calibrate": {
+    "scope": "project",
+    "version": "1",
+    "contract": "40dbfaa6b89540d0f2354440943d35014edccae78f5c3846325d36d94c3cccb2",
+    "transactional": true
+  },
+  "evaluators.create": {
+    "scope": "project",
+    "version": "1",
+    "contract": "7de7cc70b04eae67398d4086d13755785ba80e3c4b6409ed0379bbc142b8ff34",
+    "transactional": true
+  },
+  "evaluators.get": {
+    "scope": "project",
+    "version": "1",
+    "contract": "f602a3e76637dc20ca67031ccf92b4567854b43f9662dcc4dc691db21f6ba992",
+    "transactional": false
+  },
+  "evaluators.list": {
+    "scope": "project",
+    "version": "1",
+    "contract": "55db15d293536d670bc23f9d5f610b1752a6dead2e6bdfc4db3eb50694484d35",
+    "transactional": false
+  },
+  "evaluators.update": {
+    "scope": "project",
+    "version": "1",
+    "contract": "2c7356fd797311f886f83a807dd9151f47502349095d63422d9abbde561bbf1e",
+    "transactional": true
+  },
+  "experiments.cancel": {
+    "scope": "project",
+    "version": "1",
+    "contract": "5f3ac939e9aeb2d779a2b217ab6135ddc27f1ac3711b78351ef8c84f3a8632ec",
+    "transactional": false
+  },
+  "experiments.create": {
+    "scope": "project",
+    "version": "1",
+    "contract": "43b61851a6ba3f424e3f1b1514e02a36d2cf12d47f6d6b37bd7251f60e3e07a0",
+    "transactional": false
+  },
+  "experiments.get": {
+    "scope": "project",
+    "version": "1",
+    "contract": "967fcaa4861fe70c8d6714d72b51c642b8ad154f1d3309d0758e50b8cbda1e4b",
+    "transactional": false
+  },
+  "experiments.list": {
+    "scope": "project",
+    "version": "1",
+    "contract": "ccc6d4394db9f587383391371e91fe39db126893d0ec16b7685b9d3094ea0d31",
+    "transactional": false
+  },
+  "experiments.results": {
+    "scope": "project",
+    "version": "1",
+    "contract": "fbb24b583218cfd4d2c4599bdde4608d3df7e5254cf83aa06c554af04b0e740d",
+    "transactional": false
+  },
+  "experiments.runs": {
+    "scope": "project",
+    "version": "1",
+    "contract": "e41853b257a5ff006ab993d44daeb4e38213d447946afa60a0a55074a3ca0d2a",
+    "transactional": false
+  },
+  "experiments.start": {
+    "scope": "project",
+    "version": "1",
+    "contract": "4acda219c7f6aa9e9981dce38b7249fcc9f24564761dce438f59996937909bbd",
+    "transactional": false
+  },
+  "fixes.create_experiment": {
+    "scope": "project",
+    "version": "1",
+    "contract": "6a4a8df5711c38308820ba30723993b142367fb8fbe19234edd56b98accbe803",
+    "transactional": false
+  },
+  "fixes.dismiss_opportunity": {
+    "scope": "project",
+    "version": "1",
+    "contract": "929efc11df1e060e398973eba93d1105cbf7723dc6f398ba2417b5439340b19e",
+    "transactional": false
+  },
+  "fixes.get_opportunity": {
+    "scope": "project",
+    "version": "1",
+    "contract": "fa44aff71c652b883e1643cd648356cc8673947ce1e831a2cea1595ddd051c7f",
+    "transactional": false
+  },
+  "fixes.list_moves": {
+    "scope": "project",
+    "version": "1",
+    "contract": "99b056cb1501c767433278ae451ac3114b541f560dc9213551381a80159cb5c6",
+    "transactional": false
+  },
+  "fixes.list_opportunities": {
+    "scope": "project",
+    "version": "1",
+    "contract": "0ce96d7f3805e3e04ed330f85988c83d0b8fde75616fa795f594ab2eee9c6752",
+    "transactional": false
+  },
+  "fixes.list_outcomes": {
+    "scope": "project",
+    "version": "1",
+    "contract": "cd8c96388edb3e7a59b5c827e6e20a9ebc1162efe24673a295328d269000ce82",
+    "transactional": false
+  },
+  "fixes.mark_implemented": {
+    "scope": "project",
+    "version": "1",
+    "contract": "85d4d8de26126766f58b06cbf1437362ecb7d32a2a6d4f53cb783b635bd915a7",
+    "transactional": false
+  },
+  "fixes.org_practice_evidence": {
+    "scope": "project",
+    "version": "1",
+    "contract": "7d782c618383c6d359e11e9e75fbd51663a6707438324c4c2aa27539c5204034",
+    "transactional": false
+  },
+  "fixes.practice_evidence": {
+    "scope": "project",
+    "version": "1",
+    "contract": "db6dba6e7515f716ec8ea8929f60590ced9169b7547c8af8cda7ef15c4f866e7",
+    "transactional": false
+  },
+  "fixes.proposal_runs": {
+    "scope": "project",
+    "version": "1",
+    "contract": "beccabd93c0c437d26ae48b5b537ec2d3900a0379fb26d85465c0a528c54125b",
+    "transactional": false
+  },
+  "fixes.record_outcome": {
+    "scope": "project",
+    "version": "1",
+    "contract": "3d6c58f64fef2053f06fa40d8ac0c548d622cd27f703053dd6ffa2bde7eaeab6",
+    "transactional": false
+  },
+  "fixes.submit_practice_findings": {
+    "scope": "project",
+    "version": "1",
+    "contract": "b17fc138b21d328220ccf1b2efdb6d0090bd08d0e909dd57cd1094aa7616c281",
+    "transactional": false
+  },
+  "github.connect_init": {
+    "scope": "project",
+    "version": "1",
+    "contract": "a43f80f1f3d9a26fc043064a179e547f054f23c9aca7290cdb323d70c43ac822",
+    "transactional": false
+  },
+  "github.select_repo": {
+    "scope": "project",
+    "version": "1",
+    "contract": "808b337b49b81a5b8e520f427bffc5462506598cadb9db34007d210c7127055f",
+    "transactional": false
+  },
+  "github.set_test_command": {
+    "scope": "project",
+    "version": "1",
+    "contract": "0e7789ab0318dcae2ed72ed526762999f73cc43f7b049f077b3727eae9d95d00",
+    "transactional": false
+  },
+  "human.add_proposal_evidence": {
+    "scope": "project",
+    "version": "1",
+    "contract": "be4b06054a485d04642b5e038d9bd541450cbbb18e1b137d385d1aa6cf8d142b",
+    "transactional": false
+  },
+  "human.agent_connections": {
+    "scope": "project",
+    "version": "1",
+    "contract": "9e0c51b3377461d29da3dd403ba9183bbdca3209ffa5df6c6e9bb94d769f78a5",
+    "transactional": false
+  },
+  "human.audit": {
+    "scope": "project",
+    "version": "1",
+    "contract": "b616fbf794c169ae59c174015e6f3550a9ea6952549e19437fb0ebb6d79afde0",
+    "transactional": false
+  },
+  "human.audit_findings": {
+    "scope": "project",
+    "version": "1",
+    "contract": "5c1fb21ebc676106b5e0a92fa6281afd73a14470a84ef8131a0ddae6508cfe50",
+    "transactional": false
+  },
+  "human.audits": {
+    "scope": "project",
+    "version": "1",
+    "contract": "c07079a1461a10aee03d76cb169375d0fa91419913a70ab3ac56b55239c1ce8d",
+    "transactional": false
+  },
+  "human.billing_account": {
+    "scope": "organization",
+    "version": "1",
+    "contract": "c44f1bb7588a52876e90eef36875c58af61818e499fafb0d621a64e6938c8b62",
+    "transactional": false
+  },
+  "human.billing_usage_daily": {
+    "scope": "organization",
+    "version": "1",
+    "contract": "81231eb9efe5cabb29b6082e6b33e9f09ff7d922e61b008b1caab06c7e9fa5f2",
+    "transactional": false
+  },
+  "human.compute_usage": {
+    "scope": "organization",
+    "version": "1",
+    "contract": "70992019a1b9e8f7cacdb31bc7c4de782c75970412afc27acbf34c16ab8fcc4f",
+    "transactional": false
+  },
+  "human.connectors": {
+    "scope": "project",
+    "version": "1",
+    "contract": "e953e5546061503d833484ff784ea36d1a0fc92edde420e47e2d45541aae2c09",
+    "transactional": false
+  },
+  "human.consents": {
+    "scope": "organization",
+    "version": "1",
+    "contract": "c549851391efdba0306eee2393e5dfc07eca238527277de6c484ffcaa2f0c551",
+    "transactional": false
+  },
+  "human.create_audit": {
+    "scope": "project",
+    "version": "1",
+    "contract": "362f3a1e775bbdb0a60a1532e2ca8e7f8eaf08ad7c4968ee0c455250ad557457",
+    "transactional": false
+  },
+  "human.create_import": {
+    "scope": "project",
+    "version": "1",
+    "contract": "b9a545e9040e0f466c7d06497998615f2eea95639b1427d696ae36e60c5ce1c2",
+    "transactional": false
+  },
+  "human.create_policy_draft": {
+    "scope": "project",
+    "version": "1",
+    "contract": "b908909e667ebdad41f4bb4a81dc67c94e9b207cf41b487180b49f3bc045ec32",
+    "transactional": false
+  },
+  "human.create_sample_data": {
+    "scope": "project",
+    "version": "1",
+    "contract": "9b0a35239fc2bc87c36ca64a2fa198a631ed06b6825d8852ba949d7ef07d4502",
+    "transactional": false
+  },
+  "human.data_request": {
+    "scope": "project",
+    "version": "1",
+    "contract": "cd25e4653c5d002b20e73ab44bb9b2c89500d3058589a2629a90e6f04f31c50d",
+    "transactional": false
+  },
+  "human.data_requests": {
+    "scope": "project",
+    "version": "1",
+    "contract": "91759f326d50a0b788390855984270bce429afb61cada914ba22b0f007e3a6d1",
+    "transactional": false
+  },
+  "human.delete_quality_monitor": {
+    "scope": "project",
+    "version": "1",
+    "contract": "883196256f103eab9e0f462a631e6c66b0dbd4a833fb552bb8729aae52f9bb3c",
+    "transactional": false
+  },
+  "human.exports": {
+    "scope": "project",
+    "version": "1",
+    "contract": "fc3d92546a1d102ecfd83300dd46145ea4a705dedbbd5dc2e3ff88e5353ad49d",
+    "transactional": false
+  },
+  "human.external_spend": {
+    "scope": "project",
+    "version": "1",
+    "contract": "f5ad746b35138cc4f3489ebf6a010429fab739324828d5305ce68ce7a87c630d",
+    "transactional": false
+  },
+  "human.github": {
+    "scope": "project",
+    "version": "1",
+    "contract": "cd0427b23ec10dd8e4b8f42d9030749158bb3d30de9b5ca2221dcece49b6579f",
+    "transactional": false
+  },
+  "human.import_gateway_config": {
+    "scope": "project",
+    "version": "1",
+    "contract": "7d4e8f27090db204ced05e0ab16cc321220b5a80b3e06c8da2a93a7573dcbb41",
+    "transactional": false
+  },
+  "human.imports": {
+    "scope": "project",
+    "version": "1",
+    "contract": "e7bf442dc2e8d6831acb09d9578ff1c433f056f58c27e0bcbb7c8c1b6e0461f1",
+    "transactional": false
+  },
+  "human.job": {
+    "scope": "project",
+    "version": "1",
+    "contract": "ea7e85f510ad266afedd89db7f9b5f26876d027d4069b8513895baeffb0edf02",
+    "transactional": false
+  },
+  "human.list_keys": {
+    "scope": "project",
+    "version": "1",
+    "contract": "8ae555bc3ff59c030b3c296417f4515cdb9e4aa7f096619212098742cb741e8f",
+    "transactional": false
+  },
+  "human.metering_receipts": {
+    "scope": "project",
+    "version": "1",
+    "contract": "36f9f68fa8cd06429b2829726abae2ece69c4f243ecea0a4e0450ac6aa69b26f",
+    "transactional": false
+  },
+  "human.onboarding": {
+    "scope": "project",
+    "version": "1",
+    "contract": "34980d13c051b069b730b24e1203b2ebd647d96cd6af97975faa5c9a92e69497",
+    "transactional": false
+  },
+  "human.onboarding_learn": {
+    "scope": "project",
+    "version": "1",
+    "contract": "08ecb24312cad43375370588ce1480f4a755d4de9bee3f3daf2c2ffe955b8a69",
+    "transactional": false
+  },
+  "human.organizations": {
+    "scope": "organization",
+    "version": "1",
+    "contract": "16965e6f630126f3c2acbb0629ba02d8e66d42b1d0b62c9614730f3312c08415",
+    "transactional": false
+  },
+  "human.policies": {
+    "scope": "project",
+    "version": "1",
+    "contract": "6442c5c8a3541c3fce1c22c888bed4a74209134ccf4f36a293223ac93bdbc21a",
+    "transactional": false
+  },
+  "human.policy": {
+    "scope": "project",
+    "version": "1",
+    "contract": "50340651c7f4ce05cc2142730e44df1ff117923d41c666fd2be156d67580797b",
+    "transactional": false
+  },
+  "human.practice_consents": {
+    "scope": "organization",
+    "version": "1",
+    "contract": "35e2f3e37b260335f5300114701d001dceed5b58b4bb5e9ce104e0aa1d1bf907",
+    "transactional": false
+  },
+  "human.provider_catalog": {
+    "scope": "organization",
+    "version": "1",
+    "contract": "401a24ad3d219061639bf2758cc7c4a9197f82967666092e86496f00c0084c5b",
+    "transactional": false
+  },
+  "human.replay_consents": {
+    "scope": "organization",
+    "version": "1",
+    "contract": "9dd5919e0e8ac90dbda0e7078e19b93a514168b094cc6724f515469d46b9b987",
+    "transactional": false
+  },
+  "human.sso": {
+    "scope": "organization",
+    "version": "1",
+    "contract": "d1e7de02236e84b0d6f0271c8980b9c509176bc514592c54ac0ecac8cab860e1",
+    "transactional": false
+  },
+  "human.start_onboarding_learn": {
+    "scope": "project",
+    "version": "1",
+    "contract": "e0a3d55c205326cc9b36cf0de0a5f23f07fad6c998c9cc53553366da7357a80a",
+    "transactional": false
+  },
+  "human.system_version": {
+    "scope": "organization",
+    "version": "1",
+    "contract": "c374ba51968a689cdf75cc59bb0c15dd0e0c1838023600d6ee0199dde6d6a4c7",
+    "transactional": false
+  },
+  "human.test_monitor_action": {
+    "scope": "project",
+    "version": "1",
+    "contract": "ab53a1e9d29759ac62419c87ae1b76cd2eb97ee8e7717320e0dfce3c2bece776",
+    "transactional": false
+  },
+  "human.update_budget": {
+    "scope": "project",
+    "version": "1",
+    "contract": "370c6eb020d1a418ca008dc1d696428310a8fc2613920cd5cdfa9d0b3cf9d482",
+    "transactional": false
+  },
+  "human.update_guardrails": {
+    "scope": "project",
+    "version": "1",
+    "contract": "76cead7c10c903e9956310e5058b9eaa5a8d5031497dcf5d4be14570017101f9",
+    "transactional": false
+  },
+  "human.update_onboarding": {
+    "scope": "project",
+    "version": "1",
+    "contract": "fa94e71d6671f749989e6a696e190d4176b81b849e084c42859f2e879aef7469",
+    "transactional": false
+  },
+  "human.update_org": {
+    "scope": "organization",
+    "version": "1",
+    "contract": "445ce8379f6821b6613a41acc474933bbc4cbc13e9fc7f8f247b5e2a924ddf2b",
+    "transactional": false
+  },
+  "human.update_policy_draft": {
+    "scope": "project",
+    "version": "1",
+    "contract": "bf4ffc1d21dbf6db41cc06f5178c36d5d5bff1dfc1623d9d5da5244fec333f5a",
+    "transactional": false
+  },
+  "human.validate_policy_draft": {
+    "scope": "project",
+    "version": "1",
+    "contract": "65298bf3e9eb0a393a4d945f4ecd0a9d6dbf5632736da6c0fc39da24c3c90994",
+    "transactional": false
+  },
+  "human.webhooks": {
+    "scope": "project",
+    "version": "1",
+    "contract": "b71df661fb07fcdf4c7f2fa02c326c76d34f1b3f8f149a8a33f33151d2ebed68",
+    "transactional": false
+  },
+  "inbox.act": {
+    "scope": "project",
+    "version": "1",
+    "contract": "d6bdc51b4e82cd175b8d2fffe21196052f02f489af4cf1a73845e82ce5a7ced7",
+    "transactional": false
+  },
+  "inbox.emit": {
+    "scope": "project",
+    "version": "1",
+    "contract": "82a71000ba5d37791032b8ec724fd4d6b11fa92e749517ff7b4c714bbae1321a",
+    "transactional": false
+  },
+  "inbox.get": {
+    "scope": "project",
+    "version": "1",
+    "contract": "3c013fb502349967bd801aeb01139610050505cd82a88d9d9edd0d34abb29d80",
+    "transactional": false
+  },
+  "inbox.list": {
+    "scope": "project",
+    "version": "1",
+    "contract": "4b0bddefebcf8ac60ed9c863741529110f3f9edfa572fcc3b15e5de79cf872b4",
+    "transactional": false
+  },
+  "inbox.summary": {
+    "scope": "project",
+    "version": "1",
+    "contract": "6102dc525bc5cfc29b342948c9a59ba9afad2288f5eb0fb5d1dc708db9bceaef",
+    "transactional": false
+  },
+  "judges.calibration": {
+    "scope": "project",
+    "version": "1",
+    "contract": "b3195d4064805deb064289d84f254a61fc884f288c2c8e3dde6cfc8956c04ed1",
+    "transactional": false
+  },
+  "judges.list": {
+    "scope": "project",
+    "version": "1",
+    "contract": "461627b68d1f420f37c3c9621bbd4553a5434437c95e8ac75066f69e0aeb41a0",
+    "transactional": false
+  },
+  "judges.test": {
+    "scope": "project",
+    "version": "1",
+    "contract": "3234f249a7116fd49eb327f72feaccb07dcfc615df4abde3c6a3e692624fe9df",
+    "transactional": false
+  },
+  "judgments.explain": {
+    "scope": "project",
+    "version": "1",
+    "contract": "5ff6325f99dd53693c3dd48d771feb5eab7a99047ff558a37cc30c82f069ec73",
+    "transactional": false
+  },
+  "judgments.list": {
+    "scope": "project",
+    "version": "1",
+    "contract": "34d5feb568e08656abfefd61afe9edd73ceb5d0a95f2be0c5b90acb53e6d3238",
+    "transactional": false
+  },
+  "keys.create": {
+    "scope": "project",
+    "version": "1",
+    "contract": "2ba8a98578316a600173ae9a249bfd9d6fe778904f6552c57124ebc078923d8e",
+    "transactional": false
+  },
+  "monitors.actions": {
+    "scope": "project",
+    "version": "1",
+    "contract": "5d30865d9d5889552ff3784af8f4cf4fc40bd270b6f42dd1242ac68bce38a9c0",
+    "transactional": false
+  },
+  "monitors.alert_dry_run": {
+    "scope": "project",
+    "version": "1",
+    "contract": "9c7cea562f61152bf527088e9212945e89ee81d0ffe13942a2d8bc7a7f5c0357",
+    "transactional": false
+  },
+  "monitors.backfill": {
+    "scope": "project",
+    "version": "1",
+    "contract": "6d14155ad27619fdebc538d2a8b41d5e05f0fd86654dc40e784fc027703d891c",
+    "transactional": false
+  },
+  "monitors.backfill_status": {
+    "scope": "project",
+    "version": "1",
+    "contract": "567246829a2e2b20845c9ec4a15b0f8b76dfdfa39c30178ed8dd6627a4239e9e",
+    "transactional": false
+  },
+  "monitors.cancel_backfill": {
+    "scope": "project",
+    "version": "1",
+    "contract": "e43975ded4bffa0a79be34577a8d9e44d4eb566df5369c9cfd9bfc3a16f6cc7f",
+    "transactional": false
+  },
+  "monitors.create": {
+    "scope": "project",
+    "version": "1",
+    "contract": "ed4c235d195e0a8cabe3d324c2a715748da945d70fbc59410bc0a3ffcd363cf5",
+    "transactional": false
+  },
+  "monitors.estimate": {
+    "scope": "project",
+    "version": "1",
+    "contract": "05594f8324067b0739418718c333e214d59017b685e9e8e0b8574b60fae08169",
+    "transactional": false
+  },
+  "monitors.get": {
+    "scope": "project",
+    "version": "1",
+    "contract": "1339c5e5524c1c3c8d4f57c1117d4d15a4d78d5748a924b1d96ed95ff9d3d59c",
+    "transactional": false
+  },
+  "monitors.list": {
+    "scope": "project",
+    "version": "1",
+    "contract": "3ebd250bac1a97bca752e00a25f8154cec2531c83b4052652ad98ea6696ae18a",
+    "transactional": false
+  },
+  "monitors.results": {
+    "scope": "project",
+    "version": "1",
+    "contract": "8f5b0d89e138e575a292310f15f34256a75a6f6a07e4466568a1f6663890c56b",
+    "transactional": false
+  },
+  "monitors.set_alerts": {
+    "scope": "project",
+    "version": "1",
+    "contract": "b4cfda878cc6e02c2240f76bf582603b8ce5eecd840b0b2b347425f4902b9bbb",
+    "transactional": false
+  },
+  "monitors.set_status": {
+    "scope": "project",
+    "version": "1",
+    "contract": "49d09f1fbb25440f348e3e0cb9a909bebe53f82d174f00f8cbe2329c16b85949",
+    "transactional": false
+  },
+  "monitors.update": {
+    "scope": "project",
+    "version": "1",
+    "contract": "f0a93870f599dcd835b23e20343228e9fd193e827269d1b9a0420e096234bffb",
+    "transactional": false
+  },
+  "people.delivery": {
+    "scope": "project",
+    "version": "1",
+    "contract": "77138675fe17092f08195684e24a003312d1fe5a664b4d4daf5c061f8debb3db",
+    "transactional": false
+  },
+  "people.developers": {
+    "scope": "project",
+    "version": "1",
+    "contract": "62a9735be064cd9ca6ede64255b42c342ba4f73bb28e9b6be53d95d9f16e9fbc",
+    "transactional": false
+  },
+  "people.digest": {
+    "scope": "project",
+    "version": "1",
+    "contract": "fbc08bf3239074c1e739d1f6a047550625e8539dbf69d559c9d9710245394609",
+    "transactional": false
+  },
+  "people.list_members": {
+    "scope": "organization",
+    "version": "1",
+    "contract": "bfaf11c041f9f811f20ec7a095b589bf68ccd1d706e66bde3d8b8397fd65b33f",
+    "transactional": false
+  },
+  "people.member_spend": {
+    "scope": "project",
+    "version": "1",
+    "contract": "97a0d077802c3ac8e832778515a066e3b3ef06a23621fdbf0f27b936b5ca1ef6",
+    "transactional": false
+  },
+  "people.my_delivery": {
+    "scope": "project",
+    "version": "1",
+    "contract": "12f865f7f72f97af6eb91b5d80692e90b3afdf7bf0a6248bcc3c7f58822c135b",
+    "transactional": false
+  },
+  "people.my_session": {
+    "scope": "project",
+    "version": "1",
+    "contract": "b4815914417d1b0dfb92e741e5a3047e696029d98fd11f0490bddc2276343836",
+    "transactional": false
+  },
+  "people.my_sessions": {
+    "scope": "project",
+    "version": "1",
+    "contract": "22504537057acb2901bf20dfe71a965bda158abc6444b9593440fc589e2752a9",
+    "transactional": false
+  },
+  "people.my_usage": {
+    "scope": "project",
+    "version": "1",
+    "contract": "4da1410a65a20063fc3d0555570332f0f188f07a8cd2671139c2851358e6d585",
+    "transactional": false
+  },
+  "people.repo_contributors": {
+    "scope": "project",
+    "version": "1",
+    "contract": "8bb8424c33e23b27c6f4e60238f470fe91be936b47481f9abcd5967d8dee88f4",
+    "transactional": false
+  },
+  "people.session": {
+    "scope": "project",
+    "version": "1",
+    "contract": "674de234f8148398c418598ede859cdc5f2858976ae0b95ed6462f03c01cd82e",
+    "transactional": false
+  },
+  "people.sessions": {
+    "scope": "project",
+    "version": "1",
+    "contract": "a3ae0766e75e384736da01a34022bcf8c8885560c95088908cbc348ce28b18ab",
+    "transactional": false
+  },
+  "people.spend_breakdown": {
+    "scope": "project",
+    "version": "1",
+    "contract": "0c7040cc0b0ec0f0ffe51a7239bab4927b0a715678f0a7bc0be73f4b0436c8cc",
+    "transactional": false
+  },
+  "people.statement": {
+    "scope": "project",
+    "version": "1",
+    "contract": "e806f90135c8053ffb867d13d67547bbe16e2bdd67c5cb211e6f10b4447941e9",
+    "transactional": false
+  },
+  "plan.org_plan": {
+    "scope": "organization",
+    "version": "1",
+    "contract": "122397773d40bb58a4a16ecd3fd8e4907a741f03931712128b3c9be947a08789",
+    "transactional": false
+  },
+  "plan.project_plan": {
+    "scope": "project",
+    "version": "1",
+    "contract": "37f2b02fa9cb3154455dac8a583f49f17ff271bd10ce2df5212052a866897b80",
+    "transactional": false
+  },
+  "plan.score": {
+    "scope": "project",
+    "version": "1",
+    "contract": "f05c94e29c4aff4288498b47c486bb8aee2652bf99dca739f2d454684c7e6a83",
+    "transactional": false
+  },
+  "policy.access": {
+    "scope": "project",
+    "version": "1",
+    "contract": "b23420399c81d03f42b380f0d348bf9c506b4b7e9f1dbbb73ba7c749a3494eaa",
+    "transactional": false
+  },
+  "policy.budgets": {
+    "scope": "project",
+    "version": "1",
+    "contract": "a51dc31d72238393031b144e47295dcdf195be1772ac9ddf18baeebaeb720e59",
+    "transactional": false
+  },
+  "policy.consent_status": {
+    "scope": "organization",
+    "version": "1",
+    "contract": "2b61e8cd850456b1b55d3ff9e7f504bc8f562b411216186f161d91031cf0d5c3",
+    "transactional": false
+  },
+  "policy.current": {
+    "scope": "project",
+    "version": "1",
+    "contract": "b59b1ef38198308ae7f80a481a9bb1238fdc39abacc42985d1ca5c14cf679f34",
+    "transactional": false
+  },
+  "policy.delivery_status": {
+    "scope": "project",
+    "version": "1",
+    "contract": "ac4aec53b447572051e1c195cbe213206410320a51e779aef33df3b5dddf4d83",
+    "transactional": false
+  },
+  "policy.guardrail_hits": {
+    "scope": "project",
+    "version": "1",
+    "contract": "86330cf5248f384103f660cb2edfbd9288e81a039c7e773f493dd01cc64c4ddd",
+    "transactional": false
+  },
+  "policy.guardrails": {
+    "scope": "project",
+    "version": "1",
+    "contract": "f167e6092af66a79476ddda183555e89b198a75c5be52c96ab61ee21b79db779",
+    "transactional": false
+  },
+  "policy.org_redaction_rules": {
+    "scope": "organization",
+    "version": "1",
+    "contract": "4ec475fec6955254799af084c3d6ae9bb6365eff27b4ade3b5e0cd38c4286b4c",
+    "transactional": false
+  },
+  "policy.org_retention": {
+    "scope": "organization",
+    "version": "1",
+    "contract": "ea64f90adde387114ce45c545837f962db5622dc96a0b543a0047912579dd449",
+    "transactional": false
+  },
+  "policy.retention": {
+    "scope": "project",
+    "version": "1",
+    "contract": "97c42f6e613100bba6bb7ab76c8ec56773d24432717e7cc503e111f60bb47c78",
+    "transactional": false
+  },
+  "policy.test_guardrails": {
+    "scope": "project",
+    "version": "1",
+    "contract": "c0e22e191d3a194c70939912a5e220a89d736f0709e3df0d00de0a05f65ffa5e",
+    "transactional": false
+  },
+  "project_setup.compare_semantic_cache": {
+    "scope": "project",
+    "version": "1",
+    "contract": "00db7bb58ca24ff4ac699fd7d98d8d9ff2847ca234da3a12f07840b3b7cbbb2b",
+    "transactional": false
+  },
+  "project_setup.preview_routing": {
+    "scope": "project",
+    "version": "1",
+    "contract": "445cf84674a905d172a987a151ea7dfb115fecd9c7fbf13147966413e27babfe",
+    "transactional": false
+  },
+  "project_setup.set_pixel_density": {
+    "scope": "project",
+    "version": "1",
+    "contract": "2f9e708ac62285109ae0736295f007451acbd93760b9f09e68da8b6be8e929bb",
+    "transactional": false
+  },
+  "project_setup.set_semantic_cache": {
+    "scope": "project",
+    "version": "1",
+    "contract": "8a60920050eac61ca12d75f28f8cbe9fe5512f78afefef912937579496271e4d",
+    "transactional": false
+  },
+  "projects.create": {
+    "scope": "organization",
+    "version": "1",
+    "contract": "730dad7db6984a4de00289e24fbafef64faab394bef54d3939f2840043c07355",
+    "transactional": false
+  },
+  "projects.get": {
+    "scope": "project",
+    "version": "1",
+    "contract": "d1e8b3d7eb6ad5b4738bc122bff46ade367f11bdd0a1c3977498a5f2bf73f9ad",
+    "transactional": false
+  },
+  "projects.list": {
+    "scope": "organization",
+    "version": "1",
+    "contract": "6717a3b8d1930bcb863e485734623317c0db6dfbd79405aa2173444012ea2861",
+    "transactional": false
+  },
+  "projects.update": {
+    "scope": "project",
+    "version": "1",
+    "contract": "5fac8d8039edf17d1c527b67c2981cc32b96e7c57cc1b716618ad13a01e67acb",
+    "transactional": false
+  },
+  "prompts.add_version": {
+    "scope": "project",
+    "version": "1",
+    "contract": "eb8bff3024d93f40cdaeedfdec3a8f2150d936a2159cbf58b4b9a0ab56a1ad64",
+    "transactional": false
+  },
+  "prompts.create": {
+    "scope": "project",
+    "version": "1",
+    "contract": "2a64e2cc0fbbcc384f5a9d3f34f1db5e71c3b57581dd70598d6279359ab4d2e5",
+    "transactional": false
+  },
+  "prompts.create_environment": {
+    "scope": "project",
+    "version": "1",
+    "contract": "563c5de325fc5892ae6daa6e74e5b70fa592a0c66eaf780e9aa1766480f01669",
+    "transactional": false
+  },
+  "prompts.delete": {
+    "scope": "project",
+    "version": "1",
+    "contract": "090670353cd6d1325ec2962abcdee3807a5f658105e08b6f2a81ea3bf6e0757a",
+    "transactional": false
+  },
+  "prompts.environments": {
+    "scope": "project",
+    "version": "1",
+    "contract": "9eb2596da0253aefd3ce18f4feda3f538f970ed728dffecc30e2a1f2c7468107",
+    "transactional": false
+  },
+  "prompts.get": {
+    "scope": "project",
+    "version": "1",
+    "contract": "fc411f92c0115806202319d76a7944ab8ac743aaa83136dfc377fa8ae61cecc9",
+    "transactional": false
+  },
+  "prompts.get_version": {
+    "scope": "project",
+    "version": "1",
+    "contract": "f0d894ed894f6b763fe4087467392ffe8aaba2e892f95af4e69670866b54459c",
+    "transactional": false
+  },
+  "prompts.improve": {
+    "scope": "project",
+    "version": "1",
+    "contract": "f52bab391ec9c2fa1b8e43a14e86ca7856a65db1e29907df1a53d776341eedb6",
+    "transactional": false
+  },
+  "prompts.improvement": {
+    "scope": "project",
+    "version": "1",
+    "contract": "dfe4425c339ab5f1d68778fc84db2a1397d5e6bc6bd96948f0db4e7151a6fdb9",
+    "transactional": false
+  },
+  "prompts.improvements": {
+    "scope": "project",
+    "version": "1",
+    "contract": "a22d35b9346d121741c673aa818351e4cc18b2d7a60580f47e52c1af7446ae6b",
+    "transactional": false
+  },
+  "prompts.list": {
+    "scope": "project",
+    "version": "1",
+    "contract": "5c4afea2ad8306d8f37ae8218d78fb02239956b9ec264d154b1086f7d9a77b45",
+    "transactional": false
+  },
+  "prompts.list_environments": {
+    "scope": "project",
+    "version": "1",
+    "contract": "c5299fe14a84e397594675948e8c6fc0e48f4590c28ab176146d5a1f0492953c",
+    "transactional": false
+  },
+  "prompts.pin_version": {
+    "scope": "project",
+    "version": "1",
+    "contract": "229ce55a1606a834fe18b97e5d54378ab3b537bf5fe6e8c9dccfddb54df639a8",
+    "transactional": false
+  },
+  "prompts.promote": {
+    "scope": "project",
+    "version": "1",
+    "contract": "71604c46a0236dd08e3f183cece7ff3cbd759d50f6ba9fbc8831bdf728fa85f3",
+    "transactional": false
+  },
+  "prompts.resolve": {
+    "scope": "project",
+    "version": "1",
+    "contract": "bbb52fdd4fe26cf7085b5d08d35d365daa80b51bb87c046a7247d98c5838eedb",
+    "transactional": false
+  },
+  "prompts.rollback": {
+    "scope": "project",
+    "version": "1",
+    "contract": "901803c4f75adbe9ea58f8f6c66dad927335dea424dba9fcf283798c84b60a49",
+    "transactional": false
+  },
+  "proposals.get": {
+    "scope": "project",
+    "version": "1",
+    "contract": "65f699cb84a717bb6e74eed3f4170231ba4766823ce82b95983f778269f00651",
+    "transactional": false
+  },
+  "proposals.list": {
+    "scope": "project",
+    "version": "1",
+    "contract": "68bad9ded3dc8574508bc5e5ad9e5350310f8baa2969f0b3b93720692fffea08",
+    "transactional": false
+  },
+  "providers.create": {
+    "scope": "project",
+    "version": "1",
+    "contract": "02ab4a0e8681433f3467fe48e4a0cf47c917f41a73809b5316e375a542d5325d",
+    "transactional": false
+  },
+  "providers.delete": {
+    "scope": "project",
+    "version": "1",
+    "contract": "caaf0030162ba5b14134ea38028c0c52050e42e262c2d6a2a76bd49799ac31ff",
+    "transactional": false
+  },
+  "providers.list": {
+    "scope": "project",
+    "version": "1",
+    "contract": "897c3ae0664ab8abbacf1c1e4da3eee9814a1d47580db2d90203459e85fc06d3",
+    "transactional": false
+  },
+  "providers.rotate_secret": {
+    "scope": "project",
+    "version": "1",
+    "contract": "8c3d663959ecc69b1013b8e703dd4aa91e61ea9c9a240ffd09a2b3f1094379b0",
+    "transactional": false
+  },
+  "providers.verify": {
+    "scope": "project",
+    "version": "1",
+    "contract": "88de71079437d46c58656dc9865a6c410858ba6bed99a3fdaacaeb6d4ca327a7",
+    "transactional": false
+  },
+  "qualifications.activate": {
+    "scope": "project",
+    "version": "1",
+    "contract": "f6fd147ac94fea8d857d727980a269f1eeb9b6de28be7c515e648f1b26fa9dad",
+    "transactional": false
+  },
+  "qualifications.cancel": {
+    "scope": "project",
+    "version": "1",
+    "contract": "37e1f7375efce93660a78b3578c0dbe2968b644ef39052d81425d3d419d52c26",
+    "transactional": false
+  },
+  "qualifications.list": {
+    "scope": "project",
+    "version": "1",
+    "contract": "0863de6cd4b4b966a11c8f60a4df6b02f5469036be2d9442b5374ab60071a786",
+    "transactional": false
+  },
+  "qualifications.refresh": {
+    "scope": "project",
+    "version": "1",
+    "contract": "03b899eb0c7211b605083ea12d245b9ec8a4033a2f71e8eecf62cc15cbbbc4cf",
+    "transactional": false
+  },
+  "qualifications.sets": {
+    "scope": "project",
+    "version": "1",
+    "contract": "49f4a8031bffd423cd1235c95ce1cd70cf82e05cc326c0958c188307405f65e0",
+    "transactional": false
+  },
+  "quality_setup.approve": {
+    "scope": "project",
+    "version": "1",
+    "contract": "c7da0c9753ffe6cb78e248136c53a074379428163b8ceb6d8521da569893a716",
+    "transactional": false
+  },
+  "quality_setup.decline": {
+    "scope": "project",
+    "version": "1",
+    "contract": "13edd80d67bbec11f54315052534605e73689be35b79f67178c86566c41f5082",
+    "transactional": false
+  },
+  "quality_setup.draft": {
+    "scope": "project",
+    "version": "1",
+    "contract": "68eb8d0a0bf0ba0f54f003be146c47fe1a4a0a06c1862d6ea12bc8904d17437e",
+    "transactional": false
+  },
+  "quality_setup.proposals": {
+    "scope": "project",
+    "version": "1",
+    "contract": "36fc69bf36f143723683b9025346b8a416444958c2514db3fe2475369d06d611",
+    "transactional": false
+  },
+  "quality.list_review_schemas": {
+    "scope": "project",
+    "version": "1",
+    "contract": "14ebf126f600f0d582faf363fb4d6a101d8cd45c7c3df937cc80ebc26eb3864e",
+    "transactional": false
+  },
+  "quality.review_agreement": {
+    "scope": "project",
+    "version": "1",
+    "contract": "9ff29c69c7f8ea9c2f907e65a5fe3351badcd28e64bc54f10ddc60078ddb505c",
+    "transactional": false
+  },
+  "quality.status": {
+    "scope": "project",
+    "version": "1",
+    "contract": "26108fc3589299831524fecb8dad7bfe6eb3732b7a66641ece4dcaf1480e2a01",
+    "transactional": false
+  },
+  "reports.agents": {
+    "scope": "project",
+    "version": "1",
+    "contract": "279b33432647de4f87ad630b995dfddf6123304eae7ff12f88b41a667f4ec2b3",
+    "transactional": false
+  },
+  "reports.billing_usage": {
+    "scope": "organization",
+    "version": "1",
+    "contract": "f667c0b86a7319b44d4ec04a5d6a60e061d64906a713e8fa458f440bcd89df0b",
+    "transactional": false
+  },
+  "reports.cache": {
+    "scope": "project",
+    "version": "1",
+    "contract": "4ec319a544a98f9d3477fc80b8fffcd3983d76a1d24d1f506a22835fabf9484a",
+    "transactional": false
+  },
+  "reports.compression": {
+    "scope": "project",
+    "version": "1",
+    "contract": "692f99ad8abf4be2bf2610bb8465e42d06a6544a7162116e9bca4552a8d276a1",
+    "transactional": false
+  },
+  "reports.costs": {
+    "scope": "project",
+    "version": "1",
+    "contract": "bb1804f7bb5b51b1c21e955e8f7eea82a6d94de3cf8af36260d024db96d5a2ee",
+    "transactional": false
+  },
+  "reports.dev_agents": {
+    "scope": "project",
+    "version": "1",
+    "contract": "2be328ef3f9d8965204fecfa1836318f2988f4981730e33a9dd054e6bbb12113",
+    "transactional": false
+  },
+  "reports.fleet": {
+    "scope": "project",
+    "version": "1",
+    "contract": "87a69a3144ec405da1a4a76c4174c7bdd5e718abaedaae64b8033be737ebd4b6",
+    "transactional": false
+  },
+  "reports.model_api_last_call": {
+    "scope": "project",
+    "version": "1",
+    "contract": "baa42fa7d169ba94bdb67feefc822a2e2cd2b4066b5dad8c32edf519e6bf3161",
+    "transactional": false
+  },
+  "reports.model_api_usage": {
+    "scope": "project",
+    "version": "1",
+    "contract": "165be8d2b3d481f1aaf8424eb142daf463697b53eac69a5c92bef323a5423d38",
+    "transactional": false
+  },
+  "reports.models": {
+    "scope": "project",
+    "version": "1",
+    "contract": "89433be943b77dbfd864914d6ec8e5b2bbd446d685d81a90029734f72ad65e08",
+    "transactional": false
+  },
+  "reports.overview": {
+    "scope": "project",
+    "version": "1",
+    "contract": "278697007295c3e31b2aa4d2a74481abee0731ccf8a66b3d9c3ec967627c63a0",
+    "transactional": false
+  },
+  "reports.routes": {
+    "scope": "project",
+    "version": "1",
+    "contract": "0b5860fcc9887b1257ad9de9081054dbd8324b80378b5b4631a24f26943bb992",
+    "transactional": false
+  },
+  "reports.spend_flow": {
+    "scope": "project",
+    "version": "1",
+    "contract": "e959f939e79617c76fba22b096d86f7fed3616f6f7a5d441b554fc91d699af53",
+    "transactional": false
+  },
+  "reports.traffic_shape": {
+    "scope": "project",
+    "version": "1",
+    "contract": "a7ae4f9530252efc44fd3c36623a764a196badb0305d1039b08827dd56cadc17",
+    "transactional": false
+  },
+  "reports.usage": {
+    "scope": "project",
+    "version": "1",
+    "contract": "80dd771507838feb0317b02972accc0de4ff4892aafbc6f5c2bc3eadbbf4d2cc",
+    "transactional": false
+  },
+  "reports.verified_savings": {
+    "scope": "project",
+    "version": "1",
+    "contract": "1bfc7e619225afd4182c5dea1bc1e88460fa0d9b890039102e3a272e204e8416",
+    "transactional": false
+  },
+  "reports.why": {
+    "scope": "project",
+    "version": "1",
+    "contract": "c14ce7ac0769bb1782b32f98c58935313c7d6b775e113c1930cef213ce557d9e",
+    "transactional": false
+  },
+  "reports.workflow_detail": {
+    "scope": "project",
+    "version": "1",
+    "contract": "4a0b90fdbaa73822d09f4e07ace384bdb77f0efe274edeb22d19a0d4dac241dc",
+    "transactional": false
+  },
+  "reports.workflows": {
+    "scope": "project",
+    "version": "1",
+    "contract": "098890b63e56bb48a7fb63d06212ee021ef0b278918b02f6fa7d4c813aa4b54c",
+    "transactional": false
+  },
+  "reports.wrap_savings": {
+    "scope": "project",
+    "version": "1",
+    "contract": "0b8642e907ff17fb97023b0ede8bd397027621fb6d0ad9d2d42017a737b20b6e",
+    "transactional": false
+  },
+  "retention.update": {
+    "scope": "organization",
+    "version": "1",
+    "contract": "6477a8e3ef7658caae9fde48ba81c54dd17abefe7aa7cf70f9caa003bbc4a785",
+    "transactional": false
+  },
+  "review.add": {
+    "scope": "project",
+    "version": "1",
+    "contract": "6bfab3b2ecb0d8546d1755f626c28303436c6243681dbb90f865f075cae53e29",
+    "transactional": false
+  },
+  "review.list": {
+    "scope": "project",
+    "version": "1",
+    "contract": "d41f5b9616616fc6f2fa221a5f81ff555d83892824192117f41a14c325da627e",
+    "transactional": false
+  },
+  "review.summary": {
+    "scope": "project",
+    "version": "1",
+    "contract": "bcb104a71fc0beaf3ddb35193b005714f66316e3ade28ada20d6dfe45cc5be42",
+    "transactional": false
+  },
+  "review.update": {
+    "scope": "project",
+    "version": "1",
+    "contract": "47cb4f427b7d9e90344a7c7c9bcc1f471687be1476a85c2006f9ef641c5b135b",
+    "transactional": false
+  },
+  "routes.compare": {
+    "scope": "project",
+    "version": "1",
+    "contract": "aa95b85ad0f9fd2c7fa70d980cc1a74c07b834d5a5f915303a305c4f02573316",
+    "transactional": false
+  },
+  "evals.get_scenario_projects_projectid_scenario_connections": {
+    "scope": "project",
+    "version": "1",
+    "contract": "6b0ee57c89b4e8a72f49578405ddafd4afea8866b57a2688719867af1503816e",
+    "transactional": false
+  },
+  "evals.post_scenario_projects_projectid_scenario_runs_runid_cancel": {
+    "scope": "project",
+    "version": "1",
+    "contract": "ce28fdc960864cd8f73bbf5ad02e1bfdad02f044b30a254c5d0528f57cbce9de",
+    "transactional": false
+  },
+  "evals.get_scenario_projects_projectid_scenario_runs_runid_events": {
+    "scope": "project",
+    "version": "1",
+    "contract": "4343a8df6f8d657ce1fbceffc34960f35e290d77ecc831a70c737398b37b3984",
+    "transactional": false
+  },
+  "evals.get_scenario_projects_projectid_scenario_runs_runid_gate": {
+    "scope": "project",
+    "version": "1",
+    "contract": "1fbb860f75cb61f3041a8790424be106bc39fe5f232410e702f63f93b85cecf9",
+    "transactional": false
+  },
+  "evals.get_scenario_projects_projectid_scenario_runs_runid": {
+    "scope": "project",
+    "version": "1",
+    "contract": "c7a3c3e5eff847c01411553751aeb438220c1dec3397c7972f6e5709e1a6f33f",
+    "transactional": false
+  },
+  "evals.post_scenario_projects_projectid_scenario_runs_runid_regression": {
+    "scope": "project",
+    "version": "1",
+    "contract": "5802c202592967583def30737946b1155cfe49d6fc348c8b8c93f12e1805d7bb",
+    "transactional": false
+  },
+  "evals.post_scenario_projects_projectid_scenario_suites": {
+    "scope": "project",
+    "version": "1",
+    "contract": "446e173e37ed8a36f9a1ebaa777b805b06a6fdc15de1382881d762c93fb1f9df",
+    "transactional": false
+  },
+  "evals.get_scenario_projects_projectid_scenario_suites": {
+    "scope": "project",
+    "version": "1",
+    "contract": "8c8291df42967f47c057a40f8140b6932374403834cbdc8aa8ea974832df8693",
+    "transactional": false
+  },
+  "evals.post_scenario_projects_projectid_scenario_suites_suiteid_runs": {
+    "scope": "project",
+    "version": "1",
+    "contract": "6d6996cef0ea3295090383347df1396b1cac5b822cd30ddf8fb16d49aae9b608",
+    "transactional": false
+  },
+  "evals.get_scenario_projects_projectid_scenario_suites_suiteid_runs": {
+    "scope": "project",
+    "version": "1",
+    "contract": "7fcdc2a830d371eb515e96c66799a43250c161b4ec90cac4fb9d47331ff7e261",
+    "transactional": false
+  },
+  "evals.put_scenario_projects_projectid_scenario_suites_suiteid": {
+    "scope": "project",
+    "version": "1",
+    "contract": "b3dae565e574d28f7384c6a274158cdc3c8dd4069b9f51d83612c96d21d6572c",
+    "transactional": false
+  },
+  "scenarios.compare": {
+    "scope": "project",
+    "version": "1",
+    "contract": "a88d1ae20956986b0d6777f6905721f829edb5fd4a7df2e16a28900ebd421498",
+    "transactional": false
+  },
+  "scenarios.create": {
+    "scope": "project",
+    "version": "1",
+    "contract": "94e8152c2393710705ea27e9f4e4dbeeaa46508c29cf6a98d16d25c516766f47",
+    "transactional": true
+  },
+  "scenarios.get": {
+    "scope": "project",
+    "version": "1",
+    "contract": "ccc9426d59b8e364bbbe07522d806f163674a3cdcdc9e0b2f24dba837ee2416e",
+    "transactional": false
+  },
+  "scenarios.list": {
+    "scope": "project",
+    "version": "1",
+    "contract": "dd125831f93cdc0aefbe66bad3a6e3059cc2c58178cc9cd77b1c13cf71eb7bd2",
+    "transactional": false
+  },
+  "scenarios.update": {
+    "scope": "project",
+    "version": "1",
+    "contract": "680cf4f1417788dc220bedde74e5ca2e2f1f67d6c73f0d867fcd69997a00d9eb",
+    "transactional": true
+  },
+  "setup.assert": {
+    "scope": "project",
+    "version": "1",
+    "contract": "c9a33a3a753539c5aade67b71d0fb58ebe882f726cf34c8a42d12ed94713dff0",
+    "transactional": false
+  },
+  "setup.hold": {
+    "scope": "project",
+    "version": "1",
+    "contract": "1dc948f32fb77a44f01e2cd69fc2412fb275e62fac1930a4ceee17ed807a7bd6",
+    "transactional": false
+  },
+  "setup.show": {
+    "scope": "project",
+    "version": "1",
+    "contract": "79f340f48d76a54298cfc9bc979ad441073731acef711c8870bc50612f178705",
+    "transactional": false
+  },
+  "spot_checks.next": {
+    "scope": "project",
+    "version": "1",
+    "contract": "0581f6e609183bd4ac7a490d90bcd2c8e5693dddc65411af120445fe021c539d",
+    "transactional": false
+  },
+  "spot_checks.submit": {
+    "scope": "project",
+    "version": "1",
+    "contract": "a8525ea48a47dfd899607e9a3ccdcabbd7f36b70f3f262297467ee9f557e9f95",
+    "transactional": false
+  },
+  "sql.query": {
+    "scope": "project",
+    "version": "1",
+    "contract": "f4034423b801e9b24de9ed924fb83aa9e0a38402664b9a79d6cbacd6b4916902",
+    "transactional": false
+  },
+  "sql.schema": {
+    "scope": "project",
+    "version": "1",
+    "contract": "92dfe9cda2a4cd83f6d535cc784b24226f21e89f38745823019368eea5ed494b",
+    "transactional": false
+  },
+  "sql.tag_keys": {
+    "scope": "project",
+    "version": "1",
+    "contract": "22b5664c32be7aeb19903778f0df0908e4e0c69640c3ed43cde11fb51999c81d",
+    "transactional": false
+  },
+  "tasks.content": {
+    "scope": "project",
+    "version": "1",
+    "contract": "f9e920588200dd6344f9c1616dc16b7f6e2b70c05326d4289fe4c54458451546",
+    "transactional": false
+  },
+  "tasks.get": {
+    "scope": "project",
+    "version": "1",
+    "contract": "1078913b46302b54b966504721f2a2d6b2275caa417fff4ad5b5762ffe59cd0e",
+    "transactional": false
+  },
+  "traces.compare": {
+    "scope": "project",
+    "version": "1",
+    "contract": "bb2b77facdd5d0f488560f6efd2e8151a69cfe285de8d88211fd0d70a81e008c",
+    "transactional": false
+  },
+  "traces.filter_fields": {
+    "scope": "project",
+    "version": "1",
+    "contract": "76e5b6f9c5ca63b187cb25866c64837b2e3735b5a09dc8947887916fd892670a",
+    "transactional": false
+  },
+  "traces.get": {
+    "scope": "project",
+    "version": "1",
+    "contract": "ffab924cccd4888360cd2883fcfc5cc3efae0abf469f558f5b055a54a72443c0",
+    "transactional": false
+  },
+  "traces.list": {
+    "scope": "project",
+    "version": "1",
+    "contract": "e597d3879638c3c03cfa1e8ba7d9aff6eded0b881c5f59980ce8261510d8dfa1",
+    "transactional": false
+  },
+  "traces.payload": {
+    "scope": "project",
+    "version": "1",
+    "contract": "66987a8c77dd21545b108201a1f45b3a83ae77369009397c5889c8c064c5f1be",
+    "transactional": false
+  },
+  "traces.scores": {
+    "scope": "project",
+    "version": "1",
+    "contract": "8bb26c4288ba6efe6245746a16f8aef68ed33f8598c5d7c079ed34a70437524c",
+    "transactional": false
+  },
+  "traces.search": {
+    "scope": "project",
+    "version": "1",
+    "contract": "2381dd12892608efd19b59c954c2e50837c98e8b1d6ff4fb98d66438595cbfd5",
+    "transactional": false
+  },
+  "traces.shared_view": {
+    "scope": "project",
+    "version": "1",
+    "contract": "98ccd60257075b5e996ed6f74a7fbcb04eeeb4a00f7b5b41ab557a4fc5013f60",
+    "transactional": false
+  },
+  "traces.spans": {
+    "scope": "project",
+    "version": "1",
+    "contract": "d1392cef8dd2df5269a959ffdca6856a6076712f8fb8837e62acde5f4eea24a6",
+    "transactional": false
+  },
+  "traces.timeline": {
+    "scope": "project",
+    "version": "1",
+    "contract": "a24a6f96040239b1a113bac5869fd0f720d5b047e0fa1f29a612ea5bfb5b8196",
+    "transactional": false
+  },
+  "traces.views": {
+    "scope": "project",
+    "version": "1",
+    "contract": "b27df65d7be4671d803c24c6b3a37376d2a1e284b8f9ce1f7676c0460c32c3d4",
+    "transactional": false
+  },
+  "usage.compare": {
+    "scope": "project",
+    "version": "1",
+    "contract": "4e13b050cca844cc656f07b12d7b575b1d5469c533337e909c89302cc9230d19",
+    "transactional": false
+  },
+  "verdicts.cases": {
+    "scope": "project",
+    "version": "1",
+    "contract": "2c4fe291b36c9e3d36d25b68492361bfe4ae4b91b625ddced27003053e647000",
+    "transactional": false
+  },
+  "verdicts.decide": {
+    "scope": "project",
+    "version": "1",
+    "contract": "ae3c11df9e0e77e91c27c964d54af375b4ca7f9ee7b1381cd0faf3d24b5b02b9",
+    "transactional": false
+  },
+  "verdicts.get": {
+    "scope": "project",
+    "version": "1",
+    "contract": "622e20b3c33b0e7c516361c07fa82b2a236d72635526afd0f9da29bd17ef30d8",
+    "transactional": false
+  },
+  "verdicts.list": {
+    "scope": "project",
+    "version": "1",
+    "contract": "9e3ff4f3bfde1111d21e121623b0e372606639824a037ecb04d986664492a8f8",
+    "transactional": false
+  },
+  "wizard.cancel": {
+    "scope": "project",
+    "version": "1",
+    "contract": "c263a775029426c318c6ed9fa79a2fc3d04eda4853cddaa723d29b8d25468941",
+    "transactional": false
+  },
+  "wizard.current": {
+    "scope": "project",
+    "version": "1",
+    "contract": "e4838bf423937853437f05bb543e3eae1cb1f4494e84bf72be3a352d74a60449",
+    "transactional": false
+  },
+  "wizard.get": {
+    "scope": "project",
+    "version": "1",
+    "contract": "cd10d013a3c42ed6257c03279621ffac611b764e622e58b252f9f23350f28848",
+    "transactional": false
+  },
+  "wizard.start": {
+    "scope": "project",
+    "version": "1",
+    "contract": "f9c5c474d035ff028bad0d9c86b2e1c7c8ddb6ebcc1b4b4fd1a8683cec2140b3",
+    "transactional": false
+  },
+  "wizard.update": {
+    "scope": "project",
+    "version": "1",
+    "contract": "4cedaf4a6853bae83e964dd51a609540fda8d53adf7bd5e787fd93ced4185bef",
+    "transactional": false
+  },
+  "workflows.create": {
+    "scope": "project",
+    "version": "1",
+    "contract": "050f64fcf414f011f0e3b752b130eb1c244c6c5e5f6f39433fa9f41be9fe675f",
+    "transactional": false
+  },
+  "workflows.create_agent": {
+    "scope": "project",
+    "version": "1",
+    "contract": "a60ccacde59926deab38c0d509a9fad57337a95029d31c62403262fa78b3ffb4",
+    "transactional": false
+  },
+  "workflows.get": {
+    "scope": "project",
+    "version": "1",
+    "contract": "a4e95cdfad6b2245a7de1214c2da6e6f4498707d5a17b6200f6aa7701e71d6ef",
+    "transactional": false
+  },
+  "workflows.get_agent": {
+    "scope": "project",
+    "version": "1",
+    "contract": "6d08fd5d8622b405a77a7a1c534e4e9fde56cd8cffd1b332db532678f3d13af1",
+    "transactional": false
+  },
+  "workflows.list": {
+    "scope": "project",
+    "version": "1",
+    "contract": "a7440716b529664fe5acab686589b9a5c1016765866e7615a08a0d12c8865438",
+    "transactional": false
+  },
+  "workflows.list_agents": {
+    "scope": "project",
+    "version": "1",
+    "contract": "67100171dcf2f82b29836b548388bffdc1a1d188412d0cf82be1ecd54efb4663",
+    "transactional": false
+  },
+  "workflows.list_fingerprints": {
+    "scope": "project",
+    "version": "1",
+    "contract": "bcce89b67d42100bfa3011fcf46d0f8184e99d3c8d0656de834d9942047412bc",
+    "transactional": false
+  },
+  "workflows.update": {
+    "scope": "project",
+    "version": "1",
+    "contract": "aba819064e4f647b1752017a2bde7428971bff3aef0242d7dcf974ca016abb1f",
+    "transactional": false
+  },
+  "workflows.update_agent": {
+    "scope": "project",
+    "version": "1",
+    "contract": "7dc28a8376150320d19933eb58b6ae1c85544b36212a3c502ab1b6c7834e124e",
+    "transactional": false
+  }
+}

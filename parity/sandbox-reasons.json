@@ -1,0 +1,93 @@
+{
+  "note": "A sandbox's reason as a code (observed_reason_code, beside the sentence observed_reason), as the computers service writes it on a computer the fleet runs (the Caveman computers service, the vocabulary's one home). scripts/generate-cloud-sdk.mjs writes each code and its wait into each SDK; the Caveman sandbox test harness TestSandboxReasonsParity holds this file to the Go vocabulary and to the contract's description of the field, so a code added there and not here fails a test. wait: what a client's wait for a state does on the code, the sandbox not yet in that state: continues (it passes by itself: the wait goes on, even while the sandbox reads failed), ends (it needs the caller or the operator: the wait ends), ends_if_failed (as a sandbox with no code: the wait ends once it has failed). A code a client does not know is read as none. sentence: what the sandbox's observed_reason says with the code; <ref> is a reference the operator finds the cause by, and <time> when the copy of its disk the sandbox came back from was made (RFC 3339, UTC).",
+  "codes": {
+    "waiting_for_capacity": {
+      "wait": "continues",
+      "sentence": "Waiting for room: Cloud is short of capacity for this computer right now and keeps trying."
+    },
+    "host_unavailable": {
+      "wait": "continues",
+      "sentence": "Its host is restarting or not answering just now; Cloud tries again in a moment."
+    },
+    "stopped_by_host": {
+      "wait": "ends",
+      "sentence": "Its host restarted or ran short of memory, so it was stopped; its disk is kept. Start it again."
+    },
+    "host_maintenance": {
+      "wait": "continues",
+      "sentence": "Its host is in maintenance; it starts again once that is done."
+    },
+    "busy": {
+      "wait": "continues",
+      "sentence": "An earlier operation on it is still under way; Cloud tries again shortly."
+    },
+    "waiting_for_funding": {
+      "wait": "continues",
+      "sentence": "Waiting for funding: this organization's compute funds or limits do not let it run now."
+    },
+    "funding_check_unavailable": {
+      "wait": "continues",
+      "sentence": "the installation's funding check did not answer"
+    },
+    "organization_paused": {
+      "wait": "ends",
+      "sentence": "Cloud computers are paused for this organization. Contact support to have them turned back on."
+    },
+    "ended": {
+      "wait": "ends",
+      "sentence": "It stopped running: it shut down, rebooted or crashed. Start it again to use it."
+    },
+    "out_of_memory": {
+      "wait": "ends",
+      "sentence": "It ran out of memory and was stopped; a larger size has more."
+    },
+    "disk_lost": {
+      "wait": "ends",
+      "sentence": "Its disk was lost and it cannot be started again; delete it."
+    },
+    "settings_refused": {
+      "wait": "ends",
+      "sentence": "This Cloud cannot run it as asked; change its settings or ask the operator."
+    },
+    "snapshot_gone": {
+      "wait": "ends",
+      "sentence": "The snapshot it was to be made from is gone, so it cannot be made; delete it, and make one from another snapshot."
+    },
+    "internal_error": {
+      "wait": "ends_if_failed",
+      "sentence": "Cloud could not do this just now (reference <ref>); it is tried again, and the operator can find why with that reference."
+    },
+    "recovered_from_copy": {
+      "wait": "ends_if_failed",
+      "sentence": "It came back on another host from a copy of its disk made at <time>; what it did after that was lost."
+    },
+    "held_after_recovery": {
+      "wait": "ends",
+      "sentence": "It came back on another host from an old copy of its disk, losing what it did after that copy, and stays stopped until it is stopped and started again."
+    },
+    "booting": {
+      "wait": "ends_if_failed",
+      "sentence": "booting"
+    },
+    "waking": {
+      "wait": "ends_if_failed",
+      "sentence": "waking"
+    },
+    "going_to_sleep": {
+      "wait": "ends_if_failed",
+      "sentence": "going to sleep"
+    },
+    "pausing": {
+      "wait": "ends_if_failed",
+      "sentence": "pausing in place, its guest giving memory back"
+    },
+    "paused_under_pressure": {
+      "wait": "ends_if_failed",
+      "sentence": "paused by its host under pressure on its CPU or memory: it runs again once the pressure ends"
+    },
+    "slowed_under_pressure": {
+      "wait": "ends_if_failed",
+      "sentence": "slowed by its host under CPU pressure"
+    }
+  }
+}

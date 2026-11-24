@@ -1,0 +1,60 @@
+{
+  "name": "@caveman-ai/cloud",
+  "version": "2.0.0",
+  "description": "cvm, the Caveman Cloud CLI: every Cloud operation from the terminal, plus the Cloud MCP server. Sign in with `cvm login`; `cvm setup` signs in, picks the project, installs the Caveman Cloud skill and registers the Cloud MCP server in every coding agent it finds.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "homepage": "https://caveman.so",
+  "publishConfig": {
+    "access": "public",
+    "provenance": false
+  },
+  "engines": {
+    "node": ">=22.13"
+  },
+  "bin": {
+    "cvm": "bin/cvm.mjs"
+  },
+  "files": [
+    "bin/cvm.mjs",
+    "bin/setup.mjs",
+    "bin/tui.mjs",
+    "bin/agents.mjs",
+    "bin/ci.mjs",
+    "bin/evals.mjs",
+    "bin/agent-build.mjs",
+    "bin/agent-init.mjs",
+    "templates/",
+    "bin/deploy.mjs",
+    "bin/drive.mjs",
+    "bin/connect.mjs",
+    "bin/sandbox.mjs",
+    "bin/sessions.mjs",
+    "bin/agent-dev.mjs",
+    "bin/rooms.mjs",
+    "bin/platform2027.mjs",
+    "dist/cloud-client.mjs",
+    "dist/cloud-mcp.mjs",
+    "dist/criterion-registry.json",
+    "dist/sandboxes.mjs",
+    "dist/skills/",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "prepack": "node scripts/build.mjs",
+    "test": "node scripts/build.mjs && node --test tests/*.test.mjs"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/caveman-ai/cloud-sdk.git",
+    "directory": "packages/cli"
+  },
+  "devDependencies": {
+    "ajv": "8.20.0",
+    "ajv-formats": "3.0.1",
+    "@modelcontextprotocol/sdk": "1.32.0",
+    "esbuild": "0.28.2"
+  }
+}
