@@ -95,7 +95,7 @@ export class PlatformTransport {
     method: string,
     path: string,
     body?: unknown,
-    opts?: {signal?: AbortSignal; idempotencyKey?: string; rawBody?: string; timeoutMs?: number},
+    opts?: {signal?: AbortSignal; idempotencyKey?: string; rawBody?: string; timeoutMs?: number; deadlineMs?: number},
   ): Promise<T> {
     let attempt = 0;
     for (;;) {
@@ -112,16 +112,31 @@ export class PlatformTransport {
         headers['content-type'] = 'application/json';
         payload = JSON.stringify(body);
       }
-      const effectiveTimeout = Math.ceil(
-        opts?.timeoutMs !== undefined && Number.isFinite(opts.timeoutMs)
-          ? Math.max(50, Math.min(this.timeoutMs, opts.timeoutMs))
-          : this.timeoutMs,
-      );
+      let effectiveTimeout = this.timeoutMs;
+      if (opts?.timeoutMs !== undefined && Number.isFinite(opts.timeoutMs)) {
+        effectiveTimeout = Math.max(50, Math.min(effectiveTimeout, opts.timeoutMs));
+      }
+      if (opts?.deadlineMs !== undefined && Number.isFinite(opts.deadlineMs)) {
+        const remaining = opts.deadlineMs - performance.now();
+        if (remaining <= 0) {
+          throw new PlatformError('cave_timeout', 'Request deadline exceeded.', 408);
+        }
+        effectiveTimeout = Math.max(1, Math.min(effectiveTimeout, remaining));
+      }
+      effectiveTimeout = Math.ceil(effectiveTimeout);
       const timeoutSignal = AbortSignal.timeout(effectiveTimeout);
       const signal = opts?.signal ? AbortSignal.any([opts.signal, timeoutSignal]) : timeoutSignal;
       const reqInit: RequestInit = {method, headers, signal, redirect: 'error'};
       if (payload !== undefined) reqInit.body = payload;
-      const res = await this.fetchFn(`${this.baseURL}${path}`, reqInit);
+      let res: Response;
+      try {
+        res = await this.fetchFn(`${this.baseURL}${path}`, reqInit);
+      } catch (err) {
+        if (opts?.deadlineMs !== undefined && !opts?.signal?.aborted && performance.now() >= opts.deadlineMs) {
+          throw new PlatformError('cave_timeout', 'Request deadline exceeded.', 408);
+        }
+        throw err;
+      }
       const text = await res.text();
       if (new TextEncoder().encode(text).byteLength > MAX_PLATFORM_BODY_BYTES) {
         throw new PlatformError('cave_result_too_large', 'Response exceeds 16 MiB.', res.status);
@@ -139,6 +154,12 @@ export class PlatformTransport {
       if ((res.status === 429 || res.status >= 500) && attempt < this.retries) {
         attempt++;
         const waitMs = retryAfter !== undefined ? retryAfter * 1000 : this.retryDelayMs * 2 ** (attempt - 1);
+        if (opts?.deadlineMs !== undefined && Number.isFinite(opts.deadlineMs)) {
+          const remaining = opts.deadlineMs - performance.now();
+          if (remaining <= 0 || waitMs >= remaining) {
+            throw new PlatformError('cave_timeout', 'Request deadline exceeded during retry backoff.', 408);
+          }
+        }
         await sleepAbortable(waitMs, opts?.signal);
         continue;
       }
@@ -592,36 +613,62 @@ export class WorkflowContext {
     }
   }
 
-  /** Parks the workflow run on a durable awakeable and throws WorkflowParkedError. */
-  async wait(input: {kind: string; ask_id?: string; target_id?: string; reason?: string; expires_at?: string}): Promise<never> {
+  /**
+   * Parks the workflow run on a durable awakeable and throws WorkflowParkedError while pending.
+   * On replay, if the wait already reached a terminal state (resolved, denied, timed_out, cancelled),
+   * returns the terminal wait row so the workflow continues without parking forever.
+   */
+  async wait(input: {kind: string; ask_id?: string; target_id?: string; reason?: string; expires_at?: string}): Promise<SessionWait> {
     const w = await this.wf.parkWait(this.runId, input);
-    throw new WorkflowParkedError(w);
+    const st = (w?.status ?? 'pending').toLowerCase();
+    if (st === 'pending' || st === 'waiting' || st === '') {
+      throw new WorkflowParkedError(w);
+    }
+    return w;
   }
 
-  /** Parks on a durable zero-compute timer. */
-  sleep(seconds: number, reason = 'durable sleep'): Promise<never> {
+  /** Parks on a durable zero-compute timer; returns the resolved wait row on replay. */
+  sleep(seconds: number, reason = 'durable sleep'): Promise<SessionWait> {
     const expires_at = new Date(Date.now() + seconds * 1000).toISOString();
     return this.wait({kind: 'timer', expires_at, reason});
   }
 
-  /** Parks and files a human Inbox decision item automatically. */
-  waitForApproval(askId: string, reason: string): Promise<never> {
-    return this.wait({kind: 'approval', ask_id: askId, reason});
+  /** Parks and files a human Inbox decision item automatically; fails closed on replay unless approved/resolved. */
+  async waitForApproval(askId: string, reason: string): Promise<SessionWait> {
+    const w = await this.wait({kind: 'approval', ask_id: askId, reason});
+    const st = (w?.status ?? '').toLowerCase();
+    if (st !== 'resolved' && st !== 'approved') {
+      throw new PlatformError(
+        'workflow_approval_denied',
+        `Workflow approval "${askId}" was not approved (status=${st || 'unknown'}).`,
+        403,
+      );
+    }
+    return w;
   }
 
-  /** Caveman Gate alias inside durable workflows: parks at zero compute until a verified human approves or denies in Inbox. */
-  approve(opts: {askId: string; reason: string; expiresAt?: string}): Promise<never> {
+  /** Caveman Gate alias inside durable workflows: parks at zero compute until a verified human approves; fails closed unless approved/resolved. */
+  async approve(opts: {askId: string; reason: string; expiresAt?: string}): Promise<SessionWait> {
     const req: {kind: string; ask_id?: string; reason?: string; expires_at?: string} = {
       kind: 'approval',
       ask_id: opts.askId,
       reason: opts.reason,
     };
     if (opts.expiresAt) req.expires_at = opts.expiresAt;
-    return this.wait(req);
+    const w = await this.wait(req);
+    const st = (w?.status ?? '').toLowerCase();
+    if (st !== 'resolved' && st !== 'approved') {
+      throw new PlatformError(
+        'workflow_approval_denied',
+        `Workflow approval "${opts.askId}" was not approved (status=${st || 'unknown'}).`,
+        403,
+      );
+    }
+    return w;
   }
 
-  /** Parks at zero compute until a Caveman Sensor (`listener_event`) matches and wakes this workflow. */
-  waitForSensor(sensorId: string, opts?: {askId?: string; reason?: string; expiresAt?: string}): Promise<never> {
+  /** Parks at zero compute until a Caveman Sensor (`listener_event`) matches and wakes this workflow; returns the terminal wait on replay. */
+  waitForSensor(sensorId: string, opts?: {askId?: string; reason?: string; expiresAt?: string}): Promise<SessionWait> {
     const req: {kind: string; ask_id?: string; target_id?: string; reason?: string; expires_at?: string} = {
       kind: 'listener_event',
       target_id: sensorId,

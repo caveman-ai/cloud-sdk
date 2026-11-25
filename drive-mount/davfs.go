@@ -125,6 +125,27 @@ func NewDriveFS(client *DriveClient, opts FSOptions) (*DriveFS, error) {
 	}, nil
 }
 
+// VerifySubpath verifies that an explicitly configured non-root subpath exists
+// in the remote Drive before announcing a successful mount.
+func (d *DriveFS) VerifySubpath(ctx context.Context) error {
+	if d.subpath == "/" {
+		return nil
+	}
+	_, err := d.client.ListFiles(ctx, d.subpath, false)
+	if err != nil {
+		if errors.Is(err, ErrPermission) && strings.HasPrefix(d.client.token, ShareTokenPrefix) {
+			// Write-only share tokens refuse directory listings (403) while still
+			// permitting create-only uploads under the configured subpath.
+			return nil
+		}
+		if errors.Is(err, ErrNotFound) {
+			return fmt.Errorf("drive subfolder %q does not exist", d.subpath)
+		}
+		return err
+	}
+	return nil
+}
+
 // Close removes the private temp staging directory created for this mount.
 func (d *DriveFS) Close() error {
 	if d.ownsStagingDir && d.stagingDir != "" {
@@ -217,7 +238,7 @@ func (d *DriveFS) listDir(ctx context.Context, relDir, remoteDir string) ([]Driv
 			d.mu.Lock()
 			_, isVirtual := d.virtualDirs[relDir]
 			d.mu.Unlock()
-			if isVirtual || relDir == "/" {
+			if isVirtual || (relDir == "/" && d.subpath == "/") {
 				return d.mergeVirtualChildren(relDir, nil), nil
 			}
 			return nil, os.ErrNotExist
@@ -440,16 +461,27 @@ func (d *DriveFS) Rename(ctx context.Context, oldName, newName string) error {
 	if !d.readWrite || oldRel == "/" || newRel == "/" {
 		return os.ErrPermission
 	}
-	if newRel == oldRel || strings.HasPrefix(newRel, oldRel+"/") {
+	if newRel == oldRel || (!sameSegmentPath(oldRel, newRel) && pathsOverlap(oldRel, newRel)) {
 		return os.ErrPermission
 	}
 
-	// Support renaming a newly created empty virtual directory.
+	// Support renaming a newly created empty virtual directory (preserving any nested virtual children).
+	oldPrefix := oldRel + "/"
 	d.mu.Lock()
 	ts, wasVirtual := d.virtualDirs[oldRel]
 	if wasVirtual {
 		delete(d.virtualDirs, oldRel)
 		d.virtualDirs[newRel] = ts
+		movedChildren := make(map[string]time.Time)
+		for k, cts := range d.virtualDirs {
+			if strings.HasPrefix(k, oldPrefix) {
+				delete(d.virtualDirs, k)
+				movedChildren[newRel+strings.TrimPrefix(k, oldRel)] = cts
+			}
+		}
+		for nk, cts := range movedChildren {
+			d.virtualDirs[nk] = cts
+		}
 	}
 	d.mu.Unlock()
 	if wasVirtual {
@@ -460,6 +492,19 @@ func (d *DriveFS) Rename(ctx context.Context, oldName, newName string) error {
 	if err := d.client.Move(ctx, oldRemote, newRemote); err != nil {
 		return mapFSError(err)
 	}
+	// Move any nested mount-only virtual subfolders only AFTER the remote move succeeds.
+	d.mu.Lock()
+	movedChildren := make(map[string]time.Time)
+	for k, cts := range d.virtualDirs {
+		if strings.HasPrefix(k, oldPrefix) {
+			delete(d.virtualDirs, k)
+			movedChildren[newRel+strings.TrimPrefix(k, oldRel)] = cts
+		}
+	}
+	for nk, cts := range movedChildren {
+		d.virtualDirs[nk] = cts
+	}
+	d.mu.Unlock()
 	d.invalidate(oldRel, newRel)
 	return nil
 }
@@ -733,43 +778,77 @@ type readFile struct {
 	remote   string
 	info     driveFileInfo
 	mu       sync.Mutex
+	pos      int64
 	tmp      *os.File
 	tmpPath  string
 	reserved int64
+}
+
+type quotaStagingWriter struct {
+	fs       *DriveFS
+	dst      *os.File
+	reserved int64
+}
+
+func (q *quotaStagingWriter) Write(p []byte) (int, error) {
+	if q.reserved+int64(len(p)) > MaxMountFileBytes {
+		return 0, ErrTooLarge
+	}
+	if !q.fs.reserveStaging(int64(len(p))) {
+		return 0, ErrTooLarge
+	}
+	n, err := q.dst.Write(p)
+	q.reserved += int64(n)
+	if n < len(p) {
+		q.fs.releaseStaging(int64(len(p) - n))
+	}
+	return n, err
+}
+
+func (f *readFile) recordCopyErr(err error) {
+	if err != nil && !errors.Is(err, io.EOF) {
+		if ct := copyTrackerFromContext(f.reqCtx); ct != nil {
+			ct.RecordError(err)
+		}
+	}
 }
 
 func (f *readFile) ensureDownloaded() error {
 	if f.tmp != nil {
 		return nil
 	}
+	if f.info.Size() > MaxMountFileBytes {
+		f.recordCopyErr(ErrTooLarge)
+		return ErrTooLarge
+	}
 	tmp, err := os.CreateTemp(f.fs.stagingDir, "get-*")
 	if err != nil {
+		f.recordCopyErr(err)
 		return err
 	}
 	_ = tmp.Chmod(0o600)
-	n, _, err := f.fs.client.Download(f.reqCtx, f.remote, tmp)
+	qw := &quotaStagingWriter{fs: f.fs, dst: tmp}
+	n, _, err := f.fs.client.Download(f.reqCtx, f.remote, qw)
 	if err != nil {
+		f.fs.releaseStaging(qw.reserved)
 		tmpName := tmp.Name()
 		_ = tmp.Close()
 		_ = os.Remove(tmpName)
-		return mapFSError(err)
+		mapped := mapFSError(err)
+		f.recordCopyErr(mapped)
+		return mapped
 	}
-	if !f.fs.reserveStaging(n) {
+	if _, err := tmp.Seek(f.pos, io.SeekStart); err != nil {
+		f.fs.releaseStaging(qw.reserved)
 		tmpName := tmp.Name()
 		_ = tmp.Close()
 		_ = os.Remove(tmpName)
-		return ErrTooLarge
-	}
-	if _, err := tmp.Seek(0, io.SeekStart); err != nil {
-		f.fs.releaseStaging(n)
-		tmpName := tmp.Name()
-		_ = tmp.Close()
-		_ = os.Remove(tmpName)
+		f.recordCopyErr(err)
 		return err
 	}
 	f.tmp = tmp
 	f.tmpPath = tmp.Name()
-	f.reserved = n
+	f.reserved = qw.reserved
 	f.info.file.SizeBytes = n
 	return nil
 }
@@ -791,10 +870,18 @@ func (f *readFile) Close() error {
 func (f *readFile) Read(p []byte) (int, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
+	if isHeadRequest(f.reqCtx) {
+		return 0, io.EOF
+	}
 	if err := f.ensureDownloaded(); err != nil {
 		return 0, err
 	}
-	return f.tmp.Read(p)
+	n, err := f.tmp.Read(p)
+	f.pos += int64(n)
+	if err != nil {
+		f.recordCopyErr(err)
+	}
+	return n, err
 }
 
 func (f *readFile) Write([]byte) (int, error) { return 0, os.ErrPermission }
@@ -802,10 +889,37 @@ func (f *readFile) Write([]byte) (int, error) { return 0, os.ErrPermission }
 func (f *readFile) Seek(off int64, w int) (int64, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
+	if isHeadRequest(f.reqCtx) && f.tmp == nil {
+		// Serve metadata-only seeks on HEAD from verified Drive metadata without
+		// downloading the file body.
+		var base int64
+		switch w {
+		case io.SeekStart:
+			base = 0
+		case io.SeekCurrent:
+			base = f.pos
+		case io.SeekEnd:
+			base = f.info.Size()
+		default:
+			return 0, os.ErrInvalid
+		}
+		next := base + off
+		if next < 0 {
+			return 0, os.ErrInvalid
+		}
+		f.pos = next
+		return f.pos, nil
+	}
+	// On GET/COPY, ensure the live file is downloaded before answering Seek so
+	// ServeContent always reports the current byte length (never stale cached size).
 	if err := f.ensureDownloaded(); err != nil {
 		return 0, err
 	}
-	return f.tmp.Seek(off, w)
+	pos, err := f.tmp.Seek(off, w)
+	if err == nil {
+		f.pos = pos
+	}
+	return pos, err
 }
 
 func (f *readFile) Readdir(int) ([]os.FileInfo, error) { return nil, os.ErrInvalid }
@@ -914,6 +1028,9 @@ func (f *writeFile) Close() error {
 	}
 	if tracker := putTrackerFromContext(f.reqCtx); tracker != nil && !tracker.CompletedCleanly() {
 		return errors.New("aborted incomplete PUT upload")
+	}
+	if ct := copyTrackerFromContext(f.reqCtx); ct != nil && ct.Err() != nil {
+		return ct.Err()
 	}
 
 	st, err := f.tmp.Stat()

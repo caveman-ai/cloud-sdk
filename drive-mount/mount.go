@@ -14,10 +14,39 @@ import (
 type MountOptions struct {
 	// MountPoint is the local directory (macOS/Linux) or drive letter like "Z:" (Windows).
 	MountPoint string
+	// ExplicitMountPoint is true when the caller explicitly passed --mountpoint.
+	ExplicitMountPoint bool
 	// VolumeName is the human-readable volume label (macOS Finder / Linux).
 	VolumeName string
 	// ReadWrite mounts writable when true; read-only by default.
 	ReadWrite bool
+}
+
+// matchGVFSMountPath selects the exact GVFS mount directory matching host and port
+// so multiple concurrent loopback mounts never report each other's path.
+func matchGVFSMountPath(entries []string, host, port string) string {
+	hostToken := "host=" + host
+	portToken := "port=" + port
+	for _, entry := range entries {
+		base := filepath.Base(entry)
+		if !strings.HasPrefix(base, "dav:") {
+			continue
+		}
+		parts := strings.Split(strings.TrimPrefix(base, "dav:"), ",")
+		hasHost, hasPort := false, false
+		for _, p := range parts {
+			if p == hostToken {
+				hasHost = true
+			}
+			if p == portToken {
+				hasPort = true
+			}
+		}
+		if hasHost && hasPort {
+			return entry
+		}
+	}
+	return ""
 }
 
 // ActiveMount represents an attached OS filesystem mount that must be Unmounted

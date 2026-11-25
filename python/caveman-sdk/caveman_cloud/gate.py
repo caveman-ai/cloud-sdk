@@ -221,8 +221,11 @@ class Gate:
 
         item = self._tx.request("POST", "/api/v1/code/gates", body)
         item_id = str(item.get("id") or "")
-        if not item_id or item.get("ref_type") != "agent_gate":
-            raise GateError("cave_gate_protocol_error", "Server returned an unexpected gate response.")
+        if not item_id or item.get("ref_type") != "agent_gate" or item.get("ref_id") != act:
+            raise GateError(
+                "cave_gate_protocol_error",
+                f'Server returned an unexpected or mismatched gate response (expected action "{act}", got "{item.get("ref_id") or ""}").',
+            )
         return GatePending(
             item_id=item_id,
             action=act,
@@ -257,13 +260,26 @@ class Gate:
             remaining = deadline - time.monotonic()
             if remaining <= 0:
                 raise GateTimeoutError(pending, timeout)
-            item = self._tx.request(
-                "GET",
-                f"/api/v1/code/gates/{_quote(pending.item_id)}",
-                timeout_seconds=max(0.05, remaining),
-            )
-            if item.get("id") != pending.item_id or item.get("ref_type") != "agent_gate":
+            try:
+                item = self._tx.request(
+                    "GET",
+                    f"/api/v1/code/gates/{_quote(pending.item_id)}",
+                    timeout_seconds=max(0.05, remaining),
+                    deadline_monotonic=deadline,
+                )
+            except PlatformError as exc:
+                if exc.code == "cave_timeout":
+                    raise GateTimeoutError(pending, timeout) from None
+                raise
+            except TimeoutError:
+                if time.monotonic() >= deadline:
+                    raise GateTimeoutError(pending, timeout) from None
+                raise
+            if item.get("id") != pending.item_id or item.get("ref_type") != "agent_gate" or item.get("ref_id") != pending.action:
                 raise GateError("cave_gate_protocol_error", "Server returned mismatched gate item.", item_id=pending.item_id)
+
+            if time.monotonic() > deadline:
+                raise GateTimeoutError(pending, timeout)
 
             data = item.get("data") if isinstance(item.get("data"), dict) else {}
             gate_decision = data.get("gate_decision")

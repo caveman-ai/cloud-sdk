@@ -78,11 +78,12 @@ class GateTests(unittest.TestCase):
         def handle_get(_body: dict | None) -> tuple[int, dict]:
             polls["n"] += 1
             if polls["n"] == 1:
-                return 200, {"id": "gate-1", "status": "open", "ref_type": "agent_gate", "data": {}}
+                return 200, {"id": "gate-1", "status": "open", "ref_type": "agent_gate", "ref_id": "stripe.refund", "data": {}}
             return 200, {
                 "id": "gate-1",
                 "status": "resolved",
                 "ref_type": "agent_gate",
+                "ref_id": "stripe.refund",
                 "resolved_at": "2026-11-23T00:01:00Z",
                 "data": {"gate_decision": "approved", "gate_decided_by": "alice@acme.test"},
             }
@@ -113,11 +114,11 @@ class GateTests(unittest.TestCase):
             {
                 "POST /api/v1/code/gates": lambda _b: (
                     201,
-                    {"id": "g-deny", "status": "open", "ref_type": "agent_gate", "title": "Drop", "dedupe_key": "k", "created_at": "2026-11-23T00:00:00Z"},
+                    {"id": "g-deny", "status": "open", "ref_type": "agent_gate", "ref_id": "db.drop", "title": "Drop", "dedupe_key": "k", "created_at": "2026-11-23T00:00:00Z"},
                 ),
                 "GET /api/v1/code/gates/g-deny": lambda _b: (
                     200,
-                    {"id": "g-deny", "status": "resolved", "ref_type": "agent_gate", "data": {"gate_decision": "denied", "gate_decided_by": "bob@acme.test"}},
+                    {"id": "g-deny", "status": "resolved", "ref_type": "agent_gate", "ref_id": "db.drop", "data": {"gate_decision": "denied", "gate_decided_by": "bob@acme.test"}},
                 ),
             }
         )
@@ -131,11 +132,11 @@ class GateTests(unittest.TestCase):
             {
                 "POST /api/v1/code/gates": lambda _b: (
                     201,
-                    {"id": "g-to", "status": "open", "ref_type": "agent_gate", "title": "Drop", "dedupe_key": "k", "created_at": "2026-11-23T00:00:00Z"},
+                    {"id": "g-to", "status": "open", "ref_type": "agent_gate", "ref_id": "db.drop", "title": "Drop", "dedupe_key": "k", "created_at": "2026-11-23T00:00:00Z"},
                 ),
                 "GET /api/v1/code/gates/g-to": lambda _b: (
                     200,
-                    {"id": "g-to", "status": "open", "ref_type": "agent_gate", "data": {}},
+                    {"id": "g-to", "status": "open", "ref_type": "agent_gate", "ref_id": "db.drop", "data": {}},
                 ),
             }
         )
@@ -148,7 +149,7 @@ class GateTests(unittest.TestCase):
             {
                 "POST /api/v1/code/gates": lambda _b: (
                     201,
-                    {"id": "g-ok", "status": "open", "ref_type": "agent_gate", "title": "A", "dedupe_key": "k", "created_at": "2026-11-23T00:00:00Z"},
+                    {"id": "g-ok", "status": "open", "ref_type": "agent_gate", "ref_id": "a", "title": "A", "dedupe_key": "k", "created_at": "2026-11-23T00:00:00Z"},
                 ),
                 "GET /api/v1/code/gates/g-ok": lambda _b: (
                     200,
@@ -170,14 +171,14 @@ class GateTests(unittest.TestCase):
 
         def handle_create(body: dict) -> tuple[int, dict]:
             seen_facts.append(body["artifacts"][0]["facts"])
-            return 201, {"id": "g1", "status": "open", "ref_type": "agent_gate", "title": body["title"], "dedupe_key": "k", "created_at": "2026-11-23T00:00:00Z"}
+            return 201, {"id": "g1", "status": "open", "ref_type": "agent_gate", "ref_id": body["ref_id"], "title": body["title"], "dedupe_key": "k", "created_at": "2026-11-23T00:00:00Z"}
 
         opener = _FakeOpener(
             {
                 "POST /api/v1/code/gates": handle_create,
                 "GET /api/v1/code/gates/g1": lambda _b: (
                     200,
-                    {"id": "g1", "status": "resolved", "ref_type": "agent_gate", "data": {"gate_decision": "approved", "gate_decided_by": "cfo@acme.test"}},
+                    {"id": "g1", "status": "resolved", "ref_type": "agent_gate", "ref_id": "wire.send", "data": {"gate_decision": "approved", "gate_decided_by": "cfo@acme.test"}},
                 ),
                 "POST /api/v1/code/workflows/runs/run-1/wait": lambda b: (
                     201,
@@ -212,6 +213,83 @@ class GateTests(unittest.TestCase):
             wctx.wait_for_sensor("sensor-99", reason="Wait CI")
         self.assertEqual(c2.exception.wait["kind"], "listener_event")
         self.assertEqual(c2.exception.wait["target_id"], "sensor-99")
+
+    def test_security_action_mismatch_deadline_overrun_and_workflow_replay(self) -> None:
+        # 1. Dedupe key returning a gate for a different action must fail closed.
+        reuse_opener = _FakeOpener(
+            {
+                "POST /api/v1/code/gates": lambda _b: (
+                    200,
+                    {"id": "g-old", "status": "resolved", "ref_type": "agent_gate", "ref_id": "read.balance", "title": "Read", "dedupe_key": "k1", "created_at": "2026-11-23T00:00:00Z", "data": {"gate_decision": "approved"}},
+                ),
+            }
+        )
+        g_reuse = Gate(control_url="https://app.caveman.so", api_key="cave_live_k", opener=reuse_opener)
+        with self.assertRaises(GateError) as err_ctx:
+            g_reuse.request(action="db.drop_table", summary="Drop prod", dedupe_key="k1")
+        self.assertEqual(err_ctx.exception.code, "cave_gate_protocol_error")
+
+        # 2. 429 Retry-After exceeding wait deadline must raise GateTimeoutError, not accept late approval.
+        poll_calls = {"n": 0}
+
+        class _RateLimitOpener(_FakeOpener):
+            def open(self, req, timeout: float = 30.0) -> _FakeResponse:
+                method = req.get_method().upper()
+                path = "/" + req.full_url.split("://", 1)[1].split("/", 1)[1]
+                if f"{method} {path}" == "GET /api/v1/code/gates/g-rl":
+                    poll_calls["n"] += 1
+                    if poll_calls["n"] == 1:
+                        return _FakeResponse(429, {"error": {"code": "rate_limited", "message": "slow"}}, headers={"retry-after": "2"})
+                    return _FakeResponse(200, {"id": "g-rl", "status": "resolved", "ref_type": "agent_gate", "ref_id": "deploy.prod", "data": {"gate_decision": "approved"}})
+                return super().open(req, timeout=timeout)
+
+        rl_opener = _RateLimitOpener(
+            {
+                "POST /api/v1/code/gates": lambda b: (
+                    201,
+                    {"id": "g-rl", "status": "open", "ref_type": "agent_gate", "ref_id": b["ref_id"], "title": b["title"], "dedupe_key": "k", "created_at": "2026-11-23T00:00:00Z"},
+                ),
+            }
+        )
+        g_rl = Gate(control_url="https://app.caveman.so", api_key="cave_live_k", opener=rl_opener, retries=2)
+        with self.assertRaises(GateTimeoutError):
+            g_rl.require(action="deploy.prod", summary="Deploy", timeout_seconds=0.12, poll_interval_seconds=0.25)
+        self.assertEqual(poll_calls["n"], 1)
+
+        # 3. WorkflowContext replay returns terminal wait row instead of re-raising WorkflowParkedError.
+        replay_opener = _FakeOpener(
+            {
+                "POST /api/v1/code/workflows/runs/run-1/wait": lambda b: (
+                    200,
+                    {"id": "w-done", "session_id": "s1", "kind": b["kind"], "ask_id": b.get("ask_id"), "target_id": b.get("target_id"), "status": "resolved", "resolved_by": "alice@acme.test"},
+                ),
+            }
+        )
+        wf = Workflows(control_url="https://app.caveman.so", api_key="cave_live_k", opener=replay_opener)
+        wctx = WorkflowContext(wf, "run-1", "s1")
+        row = wctx.approve("deploy-1", "Deploy prod")
+        self.assertEqual(row["status"], "resolved")
+        srow = wctx.wait_for_sensor("sensor-99", reason="Wait CI")
+        self.assertEqual(srow["status"], "resolved")
+
+        # 4. Denied / expired / cancelled workflow approval replay MUST fail closed.
+        for bad_status in ("denied", "expired", "cancelled"):
+            denied_opener = _FakeOpener(
+                {
+                    "POST /api/v1/code/workflows/runs/run-1/wait": lambda b, st=bad_status: (
+                        200,
+                        {"id": f"w-{st}", "session_id": "s1", "kind": b["kind"], "ask_id": b.get("ask_id"), "status": st},
+                    ),
+                }
+            )
+            dwf = Workflows(control_url="https://app.caveman.so", api_key="cave_live_k", opener=denied_opener)
+            dwctx = WorkflowContext(dwf, "run-1", "s1")
+            with self.assertRaises(Exception) as c_wait:
+                dwctx.wait_for_approval("deploy-1", "Deploy prod")
+            self.assertEqual(getattr(c_wait.exception, "code", None), "workflow_approval_denied")
+            with self.assertRaises(Exception) as c_app:
+                dwctx.approve("deploy-1", "Deploy prod")
+            self.assertEqual(getattr(c_app.exception, "code", None), "workflow_approval_denied")
 
 
 if __name__ == "__main__":

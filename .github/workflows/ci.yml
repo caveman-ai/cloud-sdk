@@ -38,6 +38,8 @@ jobs:
           cache-dependency-path: go/go.sum
       - working-directory: go
         run: go vet ./... && go test -race ./...
+      - working-directory: drive-mount
+        run: go vet ./... && go test -race ./...
 
   python:
     name: Python SDK

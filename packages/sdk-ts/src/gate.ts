@@ -279,8 +279,11 @@ export class Gate {
       body,
       req.signal ? {signal: req.signal} : undefined,
     );
-    if (!item?.id || item.ref_type !== 'agent_gate') {
-      throw new GateError('cave_gate_protocol_error', 'Server returned an unexpected gate response.');
+    if (!item?.id || item.ref_type !== 'agent_gate' || item.ref_id !== action) {
+      throw new GateError(
+        'cave_gate_protocol_error',
+        `Server returned an unexpected or mismatched gate response (expected action "${action}", got "${item?.ref_id ?? ''}").`,
+      );
     }
     return {
       itemId: item.id,
@@ -316,17 +319,35 @@ export class Gate {
       if (remaining <= 0) {
         throw new GateTimeoutError(pending, timeoutMs);
       }
-      const reqOpts: {signal?: AbortSignal; timeoutMs: number} = {timeoutMs: Math.max(50, remaining)};
+      const reqOpts: {signal?: AbortSignal; timeoutMs: number; deadlineMs: number} = {
+        timeoutMs: Math.max(50, remaining),
+        deadlineMs: deadline,
+      };
       if (opts?.signal) reqOpts.signal = opts.signal;
 
-      const item = await this.tx.request<WireGateItem>(
-        'GET',
-        `/api/v1/code/gates/${encodeURIComponent(pending.itemId)}`,
-        undefined,
-        reqOpts,
-      );
-      if (!item || item.id !== pending.itemId || item.ref_type !== 'agent_gate') {
+      let item: WireGateItem;
+      try {
+        item = await this.tx.request<WireGateItem>(
+          'GET',
+          `/api/v1/code/gates/${encodeURIComponent(pending.itemId)}`,
+          undefined,
+          reqOpts,
+        );
+      } catch (err) {
+        if (opts?.signal?.aborted) {
+          throw opts.signal.reason ?? new Error('Gate wait aborted');
+        }
+        if ((err instanceof PlatformError && err.code === 'cave_timeout') || performance.now() >= deadline) {
+          throw new GateTimeoutError(pending, timeoutMs);
+        }
+        throw err;
+      }
+      if (!item || item.id !== pending.itemId || item.ref_type !== 'agent_gate' || item.ref_id !== pending.action) {
         throw new GateError('cave_gate_protocol_error', 'Server returned mismatched gate item.', 0, pending.itemId);
+      }
+
+      if (performance.now() > deadline) {
+        throw new GateTimeoutError(pending, timeoutMs);
       }
 
       const gateDecision = item.data?.gate_decision;

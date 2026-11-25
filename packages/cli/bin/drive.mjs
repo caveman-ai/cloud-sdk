@@ -1124,7 +1124,7 @@ async function mountDrive(c){
  try{
   return await new Promise((done,fail)=>{
    child.on('error',err=>{
-    if(err?.code==='ENOENT')fail(own('cave_mount_binary_missing','caveman-drive-mount binary not found in PATH. Build it with: go build -o ./bin/caveman-drive-mount ./public/drive-mount/cmd/caveman-drive-mount',1));
+    if(err?.code==='ENOENT')fail(own('cave_mount_binary_missing','caveman-drive-mount binary not found in PATH. Install it from a cloud-sdk checkout with: (cd drive-mount && go install ./cmd/caveman-drive-mount), or set CAVEMAN_DRIVE_MOUNT_BIN.',1));
     else fail(own('cave_mount_failed',`Could not start caveman-drive-mount: ${err.message}`,1));
    });
    child.on('exit',(code,signal)=>done(signal?130:(code??1)));
@@ -1167,7 +1167,7 @@ const VERBS={
  approve:{usage:'cvm drive approve DRIVE CHANGESET --at SEQ [--dry-run]',summary:'Put a changeset\'s writes into the drive as yours, by the merge\'s rules: where both changed a file the drive\'s side stays and the session\'s goes beside it, and a file you deleted that the session changed comes back. Every conflict is listed with what was done. --at is the changeset\'s head you reviewed, which review prints; a changeset the session wrote more to since is refused, to be reviewed again. --dry-run shows what approving does, at --at or the head now, and decides nothing.',flags:['dry-run','at'],args:[2,2],run:approve,cannot:'approve a changeset'},
  reject:{usage:'cvm drive reject DRIVE CHANGESET --yes',summary:'Drop a changeset: nothing of it reaches the drive. Needs --yes.',flags:['yes'],args:[2,2],run:reject,cannot:'reject a changeset'},
  undo:{usage:'cvm drive undo DRIVE --session ID',summary:'Take back what one session wrote to the drive, in one commit. What someone else changed since is left and listed.',flags:['session'],args:[1,1],run:undo,cannot:'undo a session'},
- mount:{usage:'cvm drive mount DRIVE[/PATH] [MOUNTPOINT] [--read-write] [--include-protected] [--webdav-only] [--volume-name NAME]',summary:'Mount a drive locally on macOS, Windows, or Linux over a hardened loopback WebDAV bridge (zero kexts, read-only and protected-path-hidden by default).',flags:['read-write','include-protected','webdav-only','volume-name'],args:[1,2],shared:[0,2],run:mountDrive},
+ mount:{usage:'cvm drive mount DRIVE[/PATH] [MOUNTPOINT] [--read-write] [--include-protected] [--webdav-only] [--volume-name NAME]',summary:'Mount a drive locally on macOS, Windows, or Linux over a hardened loopback WebDAV bridge (zero kexts, read-only and protected-path-hidden by default). On Linux, an explicit MOUNTPOINT requires mount.davfs/root; unprivileged GVFS assigns its own mount path.',flags:['read-write','include-protected','webdav-only','volume-name'],args:[1,2],shared:[0,2],run:mountDrive},
 };
 const text={type:'string'},flag={type:'boolean'};
 const OPTIONS={resume:text,description:text,keep:text,recursive:{...flag,short:'r'},version:text,lines:text,overwrite:flag,'include-protected':flag,'read-write':flag,'webdav-only':flag,'volume-name':text,force:flag,'dry-run':flag,glob:text,'ignore-case':{...flag,short:'i'},fixed:{...flag,short:'F'},context:{...text,short:'C'},limit:text,

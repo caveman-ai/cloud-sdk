@@ -247,3 +247,78 @@ test('Gate validates NaN/Infinity/negative options and guard() supports async wh
   await assert.rejects(() => wctx.approve({askId: 'deploy-1', reason: 'Deploy prod'}), (e) => e instanceof WorkflowParkedError && e.wait.kind === 'approval');
   await assert.rejects(() => wctx.waitForSensor('sensor-99', {reason: 'Wait CI'}), (e) => e instanceof WorkflowParkedError && e.wait.kind === 'listener_event' && e.wait.target_id === 'sensor-99');
 });
+
+test('Gate rejects action mismatch on dedupe reuse, enforces deadline across 429 Retry-After, and WorkflowContext replays resolved waits', async () => {
+  // 1. Server returns gate item whose ref_id does not match requested action (dedupe collision) -> fail closed!
+  const reuseMock = makeMockFetch({
+    'POST /api/v1/code/gates': () => ({
+      status: 200,
+      body: {id: 'g-old', status: 'resolved', ref_type: 'agent_gate', ref_id: 'read.balance', title: 'Read', dedupe_key: 'shared-k', created_at: '2026-11-23T00:00:00Z', data: {gate_decision: 'approved'}},
+    }),
+  });
+  const gReuse = new Gate({controlURL: 'https://app.caveman.so', apiKey: 'cave_live_k', fetch: reuseMock.fetchFn});
+  await assert.rejects(
+    () => gReuse.request({action: 'db.drop_table', summary: 'Drop prod', dedupeKey: 'shared-k'}),
+    (err) => err instanceof GateError && err.code === 'cave_gate_protocol_error',
+  );
+
+  // 2. 429 with Retry-After exceeding wait deadline -> GateTimeoutError, never accepts late approval!
+  let pollCalls = 0;
+  const retryMock = makeMockFetch({
+    'POST /api/v1/code/gates': ({body}) => ({
+      status: 201,
+      body: {id: 'g-rl', status: 'open', ref_type: 'agent_gate', ref_id: body.ref_id, title: body.title, dedupe_key: 'k', created_at: '2026-11-23T00:00:00Z'},
+    }),
+    'GET /api/v1/code/gates/g-rl': () => {
+      pollCalls++;
+      if (pollCalls === 1) {
+        return {status: 429, headers: {'retry-after': '2'}, body: {error: {code: 'rate_limited', message: 'slow down'}}};
+      }
+      return {
+        status: 200,
+        body: {id: 'g-rl', status: 'resolved', ref_type: 'agent_gate', ref_id: 'deploy.prod', title: 'Deploy', dedupe_key: 'k', created_at: '2026-11-23T00:00:00Z', data: {gate_decision: 'approved', gate_decided_by: 'alice@acme.test'}},
+      };
+    },
+  });
+  const gRetry = new Gate({controlURL: 'https://app.caveman.so', apiKey: 'cave_live_k', fetch: retryMock.fetchFn, retries: 2});
+  await assert.rejects(
+    () => gRetry.require({action: 'deploy.prod', summary: 'Deploy', timeoutMs: 120, pollIntervalMs: 250}),
+    (err) => err instanceof GateTimeoutError,
+  );
+  assert.equal(pollCalls, 1, 'must not retry past overall gate deadline');
+
+  // 3. WorkflowContext.approve / waitForSensor return terminal wait row on replay instead of parking forever.
+  const replayMock = makeMockFetch({
+    'POST /api/v1/code/workflows/runs/run-1/wait': ({body}) => ({
+      status: 200,
+      body: {id: 'wait-resolved', session_id: 's1', kind: body.kind, ask_id: body.ask_id, target_id: body.target_id, status: 'resolved', resolved_by: 'alice@acme.test', created_at: '2026-11-23T00:00:00Z'},
+    }),
+  });
+  const wf = new Workflows({controlURL: 'https://app.caveman.so', apiKey: 'cave_live_k', fetch: replayMock.fetchFn});
+  const wctx = new WorkflowContext(wf, 'run-1', 's1');
+  const resolvedApproval = await wctx.approve({askId: 'deploy-1', reason: 'Deploy prod'});
+  assert.equal(resolvedApproval.status, 'resolved');
+  assert.equal(resolvedApproval.resolved_by, 'alice@acme.test');
+  const resolvedSensor = await wctx.waitForSensor('sensor-99', {reason: 'Wait CI'});
+  assert.equal(resolvedSensor.status, 'resolved');
+
+  // 4. Denied / expired / cancelled workflow approval replay MUST fail closed!
+  for (const deniedStatus of ['denied', 'expired', 'cancelled']) {
+    const deniedMock = makeMockFetch({
+      'POST /api/v1/code/workflows/runs/run-1/wait': ({body}) => ({
+        status: 200,
+        body: {id: `wait-${deniedStatus}`, session_id: 's1', kind: body.kind, ask_id: body.ask_id, status: deniedStatus, created_at: '2026-11-23T00:00:00Z'},
+      }),
+    });
+    const dwf = new Workflows({controlURL: 'https://app.caveman.so', apiKey: 'cave_live_k', fetch: deniedMock.fetchFn});
+    const dwctx = new WorkflowContext(dwf, 'run-1', 's1');
+    await assert.rejects(
+      () => dwctx.waitForApproval('deploy-1', 'Deploy prod'),
+      (err) => err && err.code === 'workflow_approval_denied',
+    );
+    await assert.rejects(
+      () => dwctx.approve({askId: 'deploy-1', reason: 'Deploy prod'}),
+      (err) => err && err.code === 'workflow_approval_denied',
+    );
+  }
+});

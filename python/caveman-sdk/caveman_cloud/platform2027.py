@@ -133,6 +133,7 @@ class _PlatformTransport:
         *,
         idempotency_key: str | None = None,
         timeout_seconds: float | None = None,
+        deadline_monotonic: float | None = None,
     ) -> dict[str, Any]:
         attempt = 0
         while True:
@@ -156,7 +157,12 @@ class _PlatformTransport:
             )
             eff_timeout = self.timeout_seconds
             if timeout_seconds is not None and timeout_seconds > 0:
-                eff_timeout = max(0.05, min(self.timeout_seconds, float(timeout_seconds)))
+                eff_timeout = max(0.05, min(eff_timeout, float(timeout_seconds)))
+            if deadline_monotonic is not None:
+                rem = deadline_monotonic - time.monotonic()
+                if rem <= 0:
+                    raise PlatformError("cave_timeout", "Request deadline exceeded.", 408)
+                eff_timeout = max(0.001, min(eff_timeout, rem))
             status = 0
             raw = b""
             retry_after: int | None = None
@@ -164,6 +170,10 @@ class _PlatformTransport:
                 resp = self._opener.open(req, timeout=eff_timeout)
             except urllib.error.HTTPError as err:
                 resp = err
+            except TimeoutError:
+                if deadline_monotonic is not None and time.monotonic() >= deadline_monotonic:
+                    raise PlatformError("cave_timeout", "Request deadline exceeded.", 408) from None
+                raise
             with resp:
                 status = int(getattr(resp, "status", 0) or getattr(resp, "code", 0))
                 resp_headers = getattr(resp, "headers", None)
@@ -196,6 +206,10 @@ class _PlatformTransport:
                     if retry_after is not None and retry_after >= 0
                     else self.retry_delay_seconds * (2 ** (attempt - 1))
                 )
+                if deadline_monotonic is not None:
+                    rem = deadline_monotonic - time.monotonic()
+                    if rem <= 0 or wait >= rem:
+                        raise PlatformError("cave_timeout", "Request deadline exceeded during retry backoff.", 408)
                 if wait > 0:
                     time.sleep(wait)
                 continue
@@ -964,8 +978,12 @@ class WorkflowContext:
         barrier_id: str | None = None,
         expires_at: str | None = None,
         reason: str | None = None,
-    ) -> None:
-        """Park the workflow run on a durable awakeable and raise WorkflowParkedError."""
+    ) -> dict[str, Any]:
+        """Park the workflow run on a durable awakeable and raise WorkflowParkedError while pending.
+
+        On replay, if the wait already reached a terminal state (resolved, denied, timed_out,
+        cancelled), returns the terminal wait row so the workflow proceeds cleanly.
+        """
         wait_row = self._wf.park_wait(
             self.run_id,
             kind=kind,
@@ -975,20 +993,39 @@ class WorkflowContext:
             expires_at=expires_at,
             reason=reason,
         )
-        raise WorkflowParkedError(wait_row)
+        st = str(wait_row.get("status") or "pending").lower()
+        if st in ("pending", "waiting", ""):
+            raise WorkflowParkedError(wait_row)
+        return wait_row
 
-    def sleep(self, seconds: float, *, reason: str = "durable sleep") -> None:
-        """Park on a zero-compute durable timer."""
+    def sleep(self, seconds: float, *, reason: str = "durable sleep") -> dict[str, Any]:
+        """Park on a zero-compute durable timer; returns the resolved wait row on replay."""
         expires = (datetime.now(timezone.utc) + timedelta(seconds=seconds)).isoformat().replace("+00:00", "Z")
-        self.wait(kind="timer", expires_at=expires, reason=reason)
+        return self.wait(kind="timer", expires_at=expires, reason=reason)
 
-    def wait_for_approval(self, ask_id: str, reason: str) -> None:
-        """Park and file an Inbox human decision item automatically."""
-        self.wait(kind="approval", ask_id=ask_id, reason=reason)
+    def wait_for_approval(self, ask_id: str, reason: str) -> dict[str, Any]:
+        """Park and file an Inbox human decision item automatically; fails closed unless approved/resolved."""
+        wait_row = self.wait(kind="approval", ask_id=ask_id, reason=reason)
+        st = str(wait_row.get("status") or "").lower()
+        if st not in ("resolved", "approved"):
+            raise PlatformError(
+                "workflow_approval_denied",
+                f'Workflow approval "{ask_id}" was not approved (status={st or "unknown"}).',
+                403,
+            )
+        return wait_row
 
-    def approve(self, ask_id: str, reason: str, *, expires_at: str | None = None) -> None:
-        """Caveman Gate alias inside durable workflows: parks at zero compute until human approval."""
-        self.wait(kind="approval", ask_id=ask_id, reason=reason, expires_at=expires_at)
+    def approve(self, ask_id: str, reason: str, *, expires_at: str | None = None) -> dict[str, Any]:
+        """Caveman Gate alias inside durable workflows: parks at zero compute until human approval; fails closed unless approved/resolved."""
+        wait_row = self.wait(kind="approval", ask_id=ask_id, reason=reason, expires_at=expires_at)
+        st = str(wait_row.get("status") or "").lower()
+        if st not in ("resolved", "approved"):
+            raise PlatformError(
+                "workflow_approval_denied",
+                f'Workflow approval "{ask_id}" was not approved (status={st or "unknown"}).',
+                403,
+            )
+        return wait_row
 
     def wait_for_sensor(
         self,
@@ -997,9 +1034,9 @@ class WorkflowContext:
         ask_id: str | None = None,
         reason: str | None = None,
         expires_at: str | None = None,
-    ) -> None:
+    ) -> dict[str, Any]:
         """Park at zero compute until a Caveman Sensor (`listener_event`) matches and wakes this workflow."""
-        self.wait(
+        return self.wait(
             kind="listener_event",
             target_id=sensor_id,
             ask_id=ask_id or f"sensor:{sensor_id}",

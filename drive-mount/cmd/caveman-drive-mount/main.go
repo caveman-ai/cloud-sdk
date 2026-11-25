@@ -86,6 +86,14 @@ func run() int {
 		fmt.Fprintf(os.Stderr, "caveman-drive-mount: %s\n", drivemount.SanitizeTerminalText(err.Error()))
 		return 1
 	}
+	subCtx, cancelSub := context.WithTimeout(context.Background(), 15*time.Second)
+	if err := dfs.VerifySubpath(subCtx); err != nil {
+		cancelSub()
+		_ = dfs.Close()
+		fmt.Fprintf(os.Stderr, "caveman-drive-mount: %s\n", drivemount.SanitizeTerminalText(err.Error()))
+		return 1
+	}
+	cancelSub()
 
 	srv, err := drivemount.StartServer(dfs)
 	if err != nil {
@@ -100,7 +108,8 @@ func run() int {
 	var mounted *drivemount.ActiveMount
 	if !*webdavOnly {
 		mp := strings.TrimSpace(*mountPoint)
-		if mp == "" {
+		explicitMP := mp != ""
+		if !explicitMP {
 			mp, err = defaultMountPoint(*driveName)
 			if err != nil {
 				_ = srv.Close(context.Background())
@@ -118,9 +127,10 @@ func run() int {
 		}
 		mountCtx, cancelMount := context.WithTimeout(ctx, 20*time.Second)
 		mounted, err = drivemount.MountOS(mountCtx, srv, drivemount.MountOptions{
-			MountPoint: mp,
-			VolumeName: vol,
-			ReadWrite:  effectiveRW,
+			MountPoint:         mp,
+			ExplicitMountPoint: explicitMP,
+			VolumeName:         vol,
+			ReadWrite:          effectiveRW,
 		})
 		cancelMount()
 		if err != nil {
