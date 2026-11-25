@@ -49,7 +49,7 @@ for (const [i, id] of suite.entries()) {
     await copyFile(src, resolve(bundleDir, i ? `references/${id}.md` : 'SKILL.md'));
   }
 }
-for (const id of ['caveman-sandbox', 'caveman-drive', 'caveman-rooms', 'caveman-deploy', 'caveman-apps', 'caveman-listeners', 'caveman-workflows']) {
+for (const id of ['caveman-build', 'caveman-sandbox', 'caveman-drive', 'caveman-rooms', 'caveman-deploy', 'caveman-apps', 'caveman-listeners', 'caveman-workflows']) {
   const src = resolve(skillsDir, id, 'SKILL.md');
   if (existsSync(src)) {
     const dir = resolve(distDir, 'skills', id);

@@ -90,6 +90,7 @@ export async function keyCmd(argv, {context}) {
 }
 
 const STANDALONE_SKILLS = [
+  'caveman-build',
   'caveman-sandbox',
   'caveman-drive',
   'caveman-rooms',
@@ -100,6 +101,9 @@ const STANDALONE_SKILLS = [
 ];
 
 const SKILL_ALIASES = {
+  build: 'caveman-build',
+  platform: 'caveman-build',
+  sdk: 'caveman-build',
   sandbox: 'caveman-sandbox',
   sandboxes: 'caveman-sandbox',
   drive: 'caveman-drive',
@@ -131,7 +135,7 @@ export async function skillsCmd(argv) {
         options: {dir: {type: 'string'}},
       });
       const target = positionals[0];
-      if (!target) throw usage('Use: cvm skills add <sandbox|drive|rooms|deploy|apps|listeners|workflows|all> [--dir PATH]');
+      if (!target) throw usage('Use: cvm skills add <build|sandbox|drive|rooms|deploy|apps|listeners|workflows|all> [--dir PATH]');
       const wanted = target === 'all' ? STANDALONE_SKILLS : [SKILL_ALIASES[target] ?? target];
       const distSkills = fileURLToPath(new URL('../dist/skills', import.meta.url));
       const repoSkills = fileURLToPath(new URL('../../skills', import.meta.url));

@@ -320,7 +320,7 @@ const commands=[
  {id:'workflows',usage:'cvm workflows <list|create|run|get>',summary:'Code-defined durable workflows riding on the shared Session step-ledger and awakeables.'},
  {id:'pools',usage:'cvm pools <list|create|computers|archive>',summary:'N:M org computer pools and unified Cloud + local Mac computer inventory.'},
  {id:'key.quick',usage:'cvm key quick [--days 30] [--print]',summary:'Idempotently bootstrap a personal 30-day code:run key from your cvm login for 30-second sandbox/SDK access.'},
- {id:'skills.add',usage:'cvm skills <list | add sandbox|drive|rooms|deploy|apps|listeners|workflows|all>',summary:'Install focused standalone Caveman skills into Claude Code and Agent Skills directories.'},
+ {id:'skills.add',usage:'cvm skills <list | add build|sandbox|drive|rooms|deploy|apps|listeners|workflows|all>',summary:'Install focused standalone Caveman skills into Claude Code and Agent Skills directories.'},
 ];
 const argv=process.argv.slice(2);
 // What only the operation form of `evals validate` and `evals run` takes.

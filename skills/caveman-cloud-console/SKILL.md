@@ -54,6 +54,19 @@ what to click and where.
 | Coding agents | `/dashboards/builtin:coding-agents` | `cvm people developers --window 7d`, `cvm people delivery --window 7d`, `cvm people sessions --window 7d --limit 20`, `cvm reports dev_agents --window 7d` |
 | Connect an agent | `/dev/getting-started` | **caveman-cloud-connect** |
 
+## Build and run
+
+| Page | Path | Read with |
+|---|---|---|
+| Deployments | `/code/deployments` | `cvm deployments list`, `cvm deployments get NAME`; **caveman-deploy** |
+| Sessions | `/code/sessions` | `cvm sessions waits ID`, `cvm run --session ID`; **caveman-deploy** |
+| Sandboxes & pools | `/code/computers` | `cvm sandbox list`, `cvm pools list`, `cvm sandbox status`; **caveman-sandbox** |
+| Drives | `/code/drives` | `cvm drive list`, `cvm drive review DRIVE`; **caveman-drive** |
+| Rooms | `/code/rooms` | `cvm room list`, `cvm room threads ROOM`; **caveman-rooms** |
+| Apps | `/code/apps` | `cvm apps list`; **caveman-apps** |
+| Listeners | `/code/listeners` | `cvm listeners list`; **caveman-listeners** |
+| Workflows | `/code/workflows` | `cvm workflows list`; **caveman-workflows** |
+
 ## Admin
 
 | Page | Path | Read with |
