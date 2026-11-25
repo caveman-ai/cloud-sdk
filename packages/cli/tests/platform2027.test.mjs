@@ -18,6 +18,7 @@ test('cvm skills list shows all standalone 30-second primitive skills', () => {
   const res = runCvm(['skills', 'list']);
   assert.equal(res.status, 0, res.stderr);
   for (const id of [
+    'caveman-build',
     'caveman-sandbox',
     'caveman-drive',
     'caveman-rooms',
@@ -32,6 +33,9 @@ test('cvm skills list shows all standalone 30-second primitive skills', () => {
 
 test('cvm skills add installs a standalone skill into an isolated target directory', () => {
   const home = mkdtempSync(join(tmpdir(), 'cvm-skills-test-'));
+  const buildRes = runCvm(['skills', 'add', 'build', '--dir', join(home, 'skills')]);
+  assert.equal(buildRes.status, 0, buildRes.stderr);
+  assert.ok(existsSync(join(home, 'skills', 'caveman-build', 'SKILL.md')));
   const res = runCvm(['skills', 'add', 'rooms', '--dir', join(home, 'skills')]);
   assert.equal(res.status, 0, res.stderr);
   assert.ok(existsSync(join(home, 'skills', 'caveman-rooms', 'SKILL.md')));

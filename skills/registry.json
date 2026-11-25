@@ -505,6 +505,17 @@
       ]
     },
     {
+      "id": "caveman-build",
+      "summary": "Master guide to building anything on Caveman Cloud: Agents, Deployments, Sandboxes, Drives, Human Gates, Rooms, Apps, Listeners, Workflows, Evals, and SDKs.",
+      "delivery": [
+        "cli",
+        "web"
+      ],
+      "suites": [
+        "cvm"
+      ]
+    },
+    {
       "id": "caveman-workflows",
       "summary": "Define and run code-first durable workflows on the shared Session step ledger via cvm workflows.",
       "delivery": [
@@ -544,6 +555,7 @@
     ],
     "cvm": [
       "caveman-cloud",
+      "caveman-build",
       "caveman-cloud-connect",
       "caveman-onboard",
       "caveman-cloud-setup",
