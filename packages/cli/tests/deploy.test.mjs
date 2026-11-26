@@ -361,7 +361,7 @@ test('deploy: a create refused because an archived agent holds the name says so;
  });
  let result=await f.run(['deploy','triage']);
  assert.equal(result.code,4,result.stdout);
- assert.deepEqual(result.json().error,{code:'cave_code_agent_archived',message:'The agent triage is archived, so its name is taken. Deploy under another agent name: set name in AGENT.md\'s frontmatter.'});
+ assert.deepEqual(result.json().error,{code:'cave_code_agent_archived',message:'The agent triage is archived, so its name is taken. Deploy under another agent name: set name in agent.json (or AGENT.md).'});
  assert.deepEqual(f.seen.map(r=>`${r.method} ${r.path}`),['GET /api/v1/code/agents','POST /api/v1/code/agents','GET /api/v1/code/agents?archived=true']);
  archived=[];
  result=await f.run(['deploy','triage']);

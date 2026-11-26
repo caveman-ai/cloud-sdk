@@ -1,0 +1,19 @@
+{
+  "$schema": "https://docs.caveman.so/schemas/agent.json",
+  "name": "researcher-drive",
+  "description": "Scheduled research digest agent writing review-gated reports into a shared Drive.",
+  "sandbox": "none",
+  "model": "claude-sonnet-5-5",
+  "drives": {
+    "/reports": { "drive": "research-reports", "write": true, "review": true }
+  },
+  "schedules": {
+    "daily-digest": {
+      "cron": "0 9 * * 1-5",
+      "timezone": "UTC",
+      "task": "Compile today's digest into /reports/daily.md and summarize key changes.",
+      "concurrency": "skip",
+      "budget_usd": 2
+    }
+  }
+}

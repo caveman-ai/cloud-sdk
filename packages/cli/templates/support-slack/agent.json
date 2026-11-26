@@ -1,0 +1,24 @@
+{
+  "$schema": "https://docs.caveman.so/schemas/agent.json",
+  "name": "support-slack",
+  "description": "Durable Slack support agent with a knowledge-base Drive, refunds skill, and taint-aware approval escalation.",
+  "sandbox": "none",
+  "model": "claude-sonnet-5-5",
+  "connectors": {
+    "linear": {
+      "tools": ["list_issues", "create_issue"],
+      "after_untrusted": "approve"
+    }
+  },
+  "drives": {
+    "/kb": "support-kb",
+    "/memory": { "drive": "support-memory", "write": true }
+  },
+  "channels": {
+    "slack": {
+      "events": ["app_mention", "direct_message"],
+      "thread_mode": "session",
+      "approvals": "interactive"
+    }
+  }
+}

@@ -1,0 +1,7 @@
+{
+  "$schema": "https://docs.caveman.so/schemas/agent.json",
+  "name": "security",
+  "description": "Focused security auditor subagent checking auth, tenancy, and secret leakage.",
+  "sandbox": "none",
+  "model": "claude-haiku-4-5"
+}

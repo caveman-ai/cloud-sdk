@@ -160,7 +160,8 @@ export async function agentDev(argv,{cwd=process.cwd()}={}){
     if(!message){res.writeHead(400,{'content-type':'application/json'});res.end(JSON.stringify({error:'message required'}));return;}
     events.push({seq:events.length+1,type:'user.message',text:message,at:new Date().toISOString()});
     if(runtimeBin&&existsSync(runtimeBin)){
-     const child=spawn(process.execPath,[runtimeBin,'agent','exec','--cwd',rootDir,'--agent-file','AGENT.md','--task',message,'--events','-'],{stdio:['ignore','pipe','pipe']});
+     const agentEntry=existsSync(join(rootDir,'AGENT.md'))?'AGENT.md':'instructions.md';
+     const child=spawn(process.execPath,[runtimeBin,'agent','exec','--cwd',rootDir,'--agent-file',agentEntry,'--task',message,'--events','-'],{stdio:['ignore','pipe','pipe']});
      let out='';for await(const chunk of child.stdout)out+=chunk.toString('utf8');
      await new Promise(r=>child.on('close',r));
      res.writeHead(200,{'content-type':'application/json'});

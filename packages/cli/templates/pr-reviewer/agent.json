@@ -1,0 +1,23 @@
+{
+  "$schema": "https://docs.caveman.so/schemas/agent.json",
+  "name": "pr-reviewer",
+  "description": "Pull request reviewer with a dedicated security subagent and structured JSON verdict output.",
+  "sandbox": "none",
+  "model": "claude-sonnet-5-5",
+  "channels": {
+    "github": {
+      "events": ["pull_request.opened", "issue_comment.created"],
+      "mention": "@caveman",
+      "thread_mode": "session"
+    }
+  },
+  "output_schema": {
+    "type": "object",
+    "required": ["verdict", "summary", "findings"],
+    "properties": {
+      "verdict": { "type": "string", "enum": ["approve", "comment", "request_changes"] },
+      "summary": { "type": "string" },
+      "findings": { "type": "array", "items": { "type": "string" } }
+    }
+  }
+}
