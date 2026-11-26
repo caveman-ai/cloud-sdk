@@ -4,15 +4,27 @@
 // and serves an interactive chat, step-ledger, approval simulator, and trigger tester
 // at http://127.0.0.1:4317.
 import {createServer} from 'node:http';
-import {existsSync,mkdirSync,readdirSync,readFileSync,statSync,watch} from 'node:fs';
+import {existsSync,mkdirSync,readdirSync,readFileSync,rmSync,statSync,watch,writeFileSync} from 'node:fs';
 import {spawn} from 'node:child_process';
-import {join,resolve} from 'node:path';
+import {dirname,join,resolve} from 'node:path';
 import {parseArgs} from 'node:util';
 import {CloudError,inertJSON} from '../dist/cloud-client.mjs';
-import {build,locate,summaryLine,formatOf} from './agent-build.mjs';
+import {build,buildFiles,locate,summaryLine,formatOf} from './agent-build.mjs';
 
 const usage=message=>Object.assign(new CloudError('cave_usage',message,2),{local:true});
 const devUsage='cvm agent dev [PATH] [--port 4317] [--remote] [--write] [--trigger schedule:NAME|webhook] [--format json|table]';
+
+function materializeDevBuild(cwd,built){
+ const dir=join(cwd,'.caveman','dev-build');
+ rmSync(dir,{recursive:true,force:true});
+ mkdirSync(dir,{recursive:true});
+ for(const [rel,text] of Object.entries(buildFiles(built))){
+  const at=join(dir,...rel.split('/'));
+  mkdirSync(dirname(at),{recursive:true});
+  writeFileSync(at,text);
+ }
+ return dir;
+}
 
 function ensureLocalDrives(cwd,manifest){
  const mounted={};
@@ -111,6 +123,7 @@ export async function agentDev(argv,{cwd=process.cwd()}={}){
   const source=locate(positionals[0],cwd);
   let current=build(source);
   let drives=ensureLocalDrives(cwd,current.manifest);
+  let devBuildDir=materializeDevBuild(cwd,current);
 
   // One-shot trigger simulation mode (`--trigger schedule:daily-digest` or `--trigger webhook`)
   if(values.trigger){
@@ -131,7 +144,7 @@ export async function agentDev(argv,{cwd=process.cwd()}={}){
     try{
      const rebuilt=build(locate(positionals[0],cwd));
      if(rebuilt.digest!==current.digest){
-      current=rebuilt; drives=ensureLocalDrives(cwd,current.manifest);
+      current=rebuilt; drives=ensureLocalDrives(cwd,current.manifest); devBuildDir=materializeDevBuild(cwd,current);
       process.stderr.write(`rebuilt  ${current.name}  ${summaryLine(current)}\n`);
      }
     }catch(err){process.stderr.write(`rebuild error: ${err.message}\n`);}
@@ -160,7 +173,7 @@ export async function agentDev(argv,{cwd=process.cwd()}={}){
     if(!message){res.writeHead(400,{'content-type':'application/json'});res.end(JSON.stringify({error:'message required'}));return;}
     events.push({seq:events.length+1,type:'user.message',text:message,at:new Date().toISOString()});
     if(runtimeBin&&existsSync(runtimeBin)){
-     const child=spawn(process.execPath,[runtimeBin,'agent','exec','--cwd',rootDir,'--agent-file','AGENT.md','--task',message,'--events','-'],{stdio:['ignore','pipe','pipe']});
+     const child=spawn(process.execPath,[runtimeBin,'agent','exec','--cwd',devBuildDir,'--agent-file','AGENT.md','--task',message,'--events','-'],{stdio:['ignore','pipe','pipe']});
      let out='';for await(const chunk of child.stdout)out+=chunk.toString('utf8');
      await new Promise(r=>child.on('close',r));
      res.writeHead(200,{'content-type':'application/json'});

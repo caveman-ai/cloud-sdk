@@ -14,7 +14,7 @@ import {version} from './agents.mjs';
 
 // What Cloud takes (the server refuses the same with 400 or 413).
 export const LIMITS={files:1000,file:2*1024*1024,agentFile:256*1024,total:8*1024*1024};
-const NAME=/^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$/,TOOL=/^[A-Za-z][A-Za-z0-9_-]{0,63}$/,SKILL=/^[a-z0-9][a-z0-9-]{0,63}$/;
+const NAME=/^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$/,TOOL=/^[A-Za-z][A-Za-z0-9_-]{0,63}$/,SKILL=/^[a-z0-9][a-z0-9-]{0,63}$/,SECRET=/^[A-Z][A-Z0-9_]{0,63}$/;
 const ENGINES=['caveman','claude-agent','codex'];
 const EVAL=/^(.+)\.eval\.(json|yaml|yml)$/,CODE=/\.(ts|tsx|mts|cts|js|jsx|mjs|cjs|py)$/;
 const usage=message=>Object.assign(new CloudError('cave_usage',message,2),{local:true});
@@ -26,13 +26,15 @@ const utf8=new TextDecoder('utf-8',{fatal:true,ignoreBOM:true});
 
 // ---- frontmatter --------------------------------------------------------
 // cvm carries no YAML parser (it has no runtime dependencies), so this reads
-// exactly what the nine keys a build is derived from take: scalars (plain,
+// exactly what the keys a build is derived from take: scalars (plain,
 // 'single' or "double" quoted), flow lists and maps ([a, b], {type: object}),
 // block lists of scalars or of maps, and nested block maps (a custom tool's
 // input_schema, a connector's tools, a drive's mount). A frontmatter that is
 // one JSON object reads too. Every other key is skipped unread; anything else
-// in the nine is refused by its line.
-export const FRONTMATTER_KEYS=['name','description','engine','model','computer','tools','connectors','budgets','drives','output_schema','schedules','channels','subagents'];
+// in those keys is refused by its line.
+export const FRONTMATTER_KEYS=['name','description','engine','model','sandbox','computer','tools','connectors','budgets','drives','output_schema','schedules','channels','subagents','secrets','image','port'];
+export const CONFIG_KEYS=['$schema',...FRONTMATTER_KEYS];
+const SANDBOX_SIZE=/^[1-9][0-9]?cpu-[1-9][0-9]{0,3}gb$/,PLAIN_SCALAR=/^[A-Za-z0-9._:/-]+$/;
 const isItem=text=>text==='-'||text.startsWith('- ');
 
 // Cut a comment: # at the start or after a space, outside a quoted scalar. A
@@ -234,25 +236,108 @@ export function readFrontmatter(text,file='AGENT.md'){
  return front;
 }
 
-// The manifest's part that comes from AGENT.md, each value checked against the
-// build contract with the line it came from.
-export function agentFields(text,file='AGENT.md'){
- const front=readFrontmatter(text,file),line=front.lineOf;
- const fail=(no,why)=>usage(`${file} line ${no}: ${why}`);
+// Resolve sandbox config from either modern `sandbox` (string or object) or legacy `computer`.
+function resolveSandbox(front,line,fail){
+ if(front.sandbox!==undefined&&front.computer!==undefined)throw fail(line(undefined,'sandbox'),'set sandbox or computer, not both.');
+ const parseStr=(v,no)=>{
+  if(typeof v!=='string'||!v.length)throw fail(no,'sandbox must be none, code, linux, full, or readonly.');
+  const low=v.toLowerCase();
+  if(low==='none')return {tier:'none',computer:'none'};
+  if(low==='code')return {tier:'code',computer:'code'};
+  if(low==='readonly')return {tier:'linux',computer:'readonly'};
+  if(low==='linux'||low==='full')return {tier:'linux',computer:'full'};
+  throw fail(no,`sandbox ${JSON.stringify(v)} is not valid; use none, code, linux, full, or readonly.`);
+ };
+ if(front.sandbox!==undefined){
+  const at=line(undefined,'sandbox'),v=front.sandbox;
+  if(typeof v==='string')return parseStr(v,at);
+  if(!isMap(v))throw fail(at,'sandbox must be none, code, linux, full, readonly, or an object {tier, size?, network?, keep?}.');
+  if(Object.getPrototypeOf(v)!==Object.prototype)throw fail(at,'uses the key __proto__, which cvm does not read.');
+  for(const k of Object.keys(v))if(!['tier','size','network','keep'].includes(k))throw fail(line(v,k,at),`sandbox takes tier, size, network, and keep; ${k} is not one of them.`);
+  if(typeof v.tier!=='string'||!['none','code','linux'].includes(v.tier))throw fail(line(v,'tier',at),'sandbox.tier must be none, code, or linux.');
+  const res={tier:v.tier,computer:v.tier==='linux'?'full':v.tier};
+  if(v.size!==undefined){
+   if(typeof v.size!=='string'||!SANDBOX_SIZE.test(v.size))throw fail(line(v,'size',at),'sandbox.size must look like 2cpu-4gb.');
+   res.size=v.size;
+  }
+  if(v.network!==undefined){
+   if(v.network!=='none'&&v.network!=='internet')throw fail(line(v,'network',at),'sandbox.network must be none or internet.');
+   res.network=v.network;
+  }
+  if(v.keep!==undefined){
+   if(v.keep!=='session'&&v.keep!=='subject')throw fail(line(v,'keep',at),'sandbox.keep must be session or subject.');
+   res.keep=v.keep;
+  }
+  return res;
+ }
+ if(front.computer!==undefined){
+  const at=line(undefined,'computer'),v=front.computer;
+  if(typeof v!=='string'||!v.length)throw fail(at,'computer must be text, such as none, readonly or full.');
+  const low=v.toLowerCase();
+  if(low==='none')return {tier:'none',computer:'none'};
+  if(low==='code')return {tier:'code',computer:'code'};
+  if(low==='readonly')return {tier:'linux',computer:'readonly'};
+  return {tier:'linux',computer:'full'};
+ }
+ return {tier:'linux',computer:'full'};
+}
+
+const formatYAMLScalar=s=>PLAIN_SCALAR.test(s)?s:JSON.stringify(s);
+export function synthesizeAgentMD(name,computer,model,instructions,{description='',engine=''}={}){
+ const lines=['---',`name: ${formatYAMLScalar(name)}`];
+ if(description)lines.push(`description: ${formatYAMLScalar(description)}`);
+ if(engine)lines.push(`engine: ${formatYAMLScalar(engine)}`);
+ lines.push(`computer: ${computer}`);
+ if(model)lines.push(`model: ${formatYAMLScalar(model)}`);
+ lines.push('---');
+ return `${lines.join('\n')}\n${instructions}`;
+}
+
+function editDistance(a,b){
+ const m=a.length,n=b.length,dp=Array.from({length:m+1},(_,i)=>Array.from({length:n+1},(_,j)=>i===0?j:j===0?i:0));
+ for(let i=1;i<=m;i++)for(let j=1;j<=n;j++)dp[i][j]=a[i-1]===b[j-1]?dp[i-1][j-1]:1+Math.min(dp[i-1][j],dp[i][j-1],dp[i-1][j-1]);
+ return dp[m][n];
+}
+function suggestConfigKey(key){
+ const low=key.toLowerCase();
+ if(['instructions','prompt','system','system_prompt','systemprompt'].includes(low))return ' Put the system prompt in instructions.md next to agent.json.';
+ if(low==='budget')return ' Did you mean "budgets" (or pass --budget USD to cvm deploy)?';
+ let best='',bestDist=3;
+ for(const candidate of CONFIG_KEYS){
+  if(candidate==='$schema')continue;
+  const d=editDistance(low,candidate);
+  if(d<bestDist){bestDist=d;best=candidate;}
+ }
+ return best?` Did you mean ${JSON.stringify(best)}?`:'';
+}
+
+// Validate normalized config fields from either agent.json or legacy AGENT.md frontmatter.
+function validateFields(front,fail){
+ const line=front.lineOf??(()=>1);
  const string=(key,check,rule)=>{
   const value=front[key];
   if(value===undefined)return undefined;
   if(typeof value!=='string'||!check(value))throw fail(line(undefined,key),`${key} must be ${rule}.`);
   return value;
  };
+ const sandbox=resolveSandbox(front,line,fail);
  const out={
   name:string('name',v=>NAME.test(v),'1 to 100 letters, digits, ".", "_" or "-", starting with a letter or digit'),
   description:string('description',v=>v.length<=500,'text of at most 500 characters'),
   engine:string('engine',v=>ENGINES.includes(v),ENGINES.join(', ').replace(/, (?=[^,]+$)/,' or ')),
   model:string('model',v=>v.length>=1&&v.length<=200,'a model id or class of 1 to 200 characters'),
-  computer:string('computer',v=>v.length>0,'text, such as none, readonly or full'),
+  computer:front.computer,
   tools:[],
  };
+ if(front.sandbox!==undefined)out.sandbox=sandbox;
+ if(front.image!==undefined){
+  out.image=string('image',v=>v.length>=1&&v.length<=500,'an OCI image digest reference');
+ }
+ if(front.port!==undefined){
+  const p=front.port;
+  if(!Number.isInteger(p)||p<1||p>65535)throw fail(line(undefined,'port'),'port must be an integer from 1 to 65535.');
+  out.port=p;
+ }
  if(front.tools!==undefined){
   if(!Array.isArray(front.tools))throw fail(line(undefined,'tools'),'tools must be a list, such as [Read, Grep] or a list of custom tools.');
   const seen=new Set();
@@ -274,7 +359,7 @@ export function agentFields(text,file='AGENT.md'){
    seen.add(tool.name);out.tools.push(tool);
   }
  }
- // Only when written: a frontmatter without them derives what it always did.
+ // Only when written: a config without them derives what it always did.
  if(front.connectors!==undefined)out.connectors=connectorsOf(front,fail);
  if(front.budgets!==undefined)out.budgets=budgetsOf(front,fail);
  if(front.drives!==undefined)out.drives=drivesOf(front,fail);
@@ -294,7 +379,44 @@ export function agentFields(text,file='AGENT.md'){
   if(!Array.isArray(front.subagents))throw fail(line(undefined,'subagents'),'subagents must be a list of {name, deployment} delegations.');
   out.subagents=front.subagents;
  }
+ // The secrets the agent's commands read, by name: the organization stores the values (cvm secrets).
+ if(front.secrets!==undefined){
+  const at=line(undefined,'secrets');
+  if(!Array.isArray(front.secrets))throw fail(at,'secrets must be a list of names, such as [STRIPE_API_KEY, SLACK_BOT_TOKEN].');
+  if(front.secrets.length>64)throw fail(at,`secrets names ${front.secrets.length} secrets; a build names at most 64.`);
+  const seen=new Set();
+  for(const [n,entry] of front.secrets.entries()){
+   const no=line(front.secrets,n,at);
+   if(typeof entry!=='string'||!SECRET.test(entry))throw fail(no,`the secret ${JSON.stringify(entry)} must be 1 to 64 capital letters, digits or "_", starting with a letter: the environment variable each command gets.`);
+   if(seen.has(entry))throw fail(no,`the secret ${entry} is listed twice.`);
+   seen.add(entry);
+  }
+  out.secrets=[...seen];
+ }
  return out;
+}
+
+// The manifest's part that comes from legacy AGENT.md, each value checked against the
+// build contract with the line it came from.
+export function agentFields(text,file='AGENT.md'){
+ const front=readFrontmatter(text,file);
+ const fail=(no,why)=>usage(`${file} line ${no}: ${why}`);
+ return validateFields(front,fail);
+}
+
+// Parse and validate a source agent.json config file alongside instructions.md.
+export function parseAgentConfig(text,file='agent.json'){
+ let parsed;
+ try{parsed=JSON.parse(text);}catch(err){throw usage(`${file}: invalid JSON: ${err.message}`);}
+ if(!isMap(parsed))throw usage(`${file}: must be a JSON object.`);
+ if(parsed.schema==='caveman.agent.build.v1')throw usage(`${file}: looks like a compiled caveman.agent.build.v1 manifest, not a source agent config.`);
+ for(const key of Object.keys(parsed)){
+  if(!CONFIG_KEYS.includes(key))throw usage(`${file}: unknown key ${JSON.stringify(key)}.${suggestConfigKey(key)} Allowed keys: ${CONFIG_KEYS.join(', ')}.`);
+ }
+ const front={...parsed};
+ Object.defineProperty(front,'lineOf',{value:()=>1});
+ const fail=(_no,why)=>usage(`${file}: ${why}`);
+ return validateFields(front,fail);
 }
 
 // ---- connectors and budgets ---------------------------------------------------
@@ -450,45 +572,56 @@ function drivesOf(front,fail){
 
 // ---- the folder -----------------------------------------------------------
 const isFile=path=>{try{const st=lstatSync(path);return st.isFile()||st.isSymbolicLink();}catch{return false;}};
-// locate finds what to build: a folder holding AGENT.md or one agent file.
-// With no path, the current folder when it holds AGENT.md, else the one agent
-// under .caveman/agents/.
+const isAgentDir=dir=>isFile(join(dir,'instructions.md'))||isFile(join(dir,'AGENT.md'));
+// locate finds what to build: a folder holding instructions.md (+ optional agent.json)
+// or legacy AGENT.md, or one agent file (*.md). With no path: current folder,
+// ./agent/, or the single agent under .caveman/agents/.
 export function locate(path,cwd=process.cwd()){
+ const checkFolder=(at,label)=>{
+  const hasInstr=isFile(join(at,'instructions.md')),hasLegacy=isFile(join(at,'AGENT.md'));
+  if(hasInstr&&hasLegacy)throw usage(`${label} holds both instructions.md and legacy AGENT.md. Keep instructions.md (+ optional agent.json) and remove AGENT.md.`);
+  if(!hasInstr&&!hasLegacy)throw usage(`${label} holds no instructions.md or AGENT.md. Name a folder that holds instructions.md (+ optional agent.json), legacy AGENT.md, or one agent file (*.md).`);
+  return {kind:'folder',root:at,label,format:hasInstr?'instructions':'legacy'};
+ };
  if(path!==undefined){
   const at=resolve(cwd,path);let st;
   try{st=lstatSync(at);}catch{throw usage(`${path} does not exist.`);}
   if(st.isSymbolicLink()){st=statSync(at,{throwIfNoEntry:false});if(!st?.isDirectory())throw usage(`${path} is a symlink; name the agent file itself.`);}
-  if(st.isDirectory()){
-   if(!isFile(join(at,'AGENT.md')))throw usage(`${path} holds no AGENT.md. Name a folder that holds AGENT.md, or one agent file (*.md).`);
-   return {kind:'folder',root:at,label:path};
+  if(st.isDirectory())return checkFolder(at,path);
+  if(st.isFile()&&(basename(at)==='agent.json'||basename(at)==='instructions.md')&&isFile(join(dirname(at),'instructions.md'))){
+   return checkFolder(dirname(at),dirname(path));
   }
-  if(!st.isFile()||!/\.md$/i.test(at))throw usage(`${path} is not an agent. Name a folder that holds AGENT.md, or one agent file (*.md).`);
-  return {kind:'file',root:dirname(at),file:at,label:path};
+  if(!st.isFile()||!/\.md$/i.test(at))throw usage(`${path} is not an agent. Name a folder that holds instructions.md (+ optional agent.json), legacy AGENT.md, or one agent file (*.md).`);
+  return {kind:'file',root:dirname(at),file:at,label:path,format:'legacy'};
  }
- if(isFile(join(cwd,'AGENT.md')))return {kind:'folder',root:cwd,label:'.'};
+ if(isAgentDir(cwd))return checkFolder(cwd,'.');
+ if(isFile(join(cwd,'agent','instructions.md'))||isFile(join(cwd,'agent','AGENT.md')))return checkFolder(join(cwd,'agent'),'agent/');
  const agents=join(cwd,'.caveman','agents');let found=[];
  try{
   for(const entry of readdirSync(agents,{withFileTypes:true})){
-   if(entry.isFile()&&/\.md$/i.test(entry.name))found.push({kind:'file',root:agents,file:join(agents,entry.name),label:`.caveman/agents/${entry.name}`});
-   else if(entry.isDirectory()&&isFile(join(agents,entry.name,'AGENT.md')))found.push({kind:'folder',root:join(agents,entry.name),label:`.caveman/agents/${entry.name}/`});
+   if(entry.isFile()&&/\.md$/i.test(entry.name))found.push({kind:'file',root:agents,file:join(agents,entry.name),label:`.caveman/agents/${entry.name}`,format:'legacy'});
+   else if(entry.isDirectory()&&isAgentDir(join(agents,entry.name))){
+    const root=join(agents,entry.name);
+    found.push(checkFolder(root,`.caveman/agents/${entry.name}/`));
+   }
   }
  }catch{}
  found=found.sort((a,b)=>bytewise(a.label,b.label));
  if(found.length===1)return found[0];
- if(!found.length)throw usage('No AGENT.md in this folder and no agent under .caveman/agents/. Name a folder that holds AGENT.md, or one agent file: cvm agent build PATH.');
+ if(!found.length)throw usage('No instructions.md or AGENT.md in this folder, ./agent/, or .caveman/agents/. Name a folder or agent file: cvm agent build PATH.');
  throw usage(`More than one agent under .caveman/agents/: ${found.map(f=>f.label.slice('.caveman/agents/'.length)).join(', ')}. Name one: cvm agent build ${found[0].label}`);
 }
 
 // collect lists the folder's build files and what is not part of the build.
-// Included: AGENT.md, skills/<name>/** with a SKILL.md, agents/<name>/** with
-// an AGENT.md, evals/*.eval.{json,yaml,yml}.
-function collect(root){
+// Included: instructions.md (+ optional agent.json) or legacy AGENT.md,
+// tools/*.{ts,tsx,js,mjs,cjs,py}, skills/<name>/** with SKILL.md,
+// subagents/<name>/** (or legacy agents/<name>/**), evals/*.eval.{json,yaml,yml}.
+function collect(root,format='legacy'){
  const files=[],excluded=[];
  const refuse=(path,why)=>{throw usage(`${path} ${why}`);};
  const link=path=>refuse(path,'is a symlink; a build holds only regular files. Copy the file into the folder instead.');
  const kind=(entry,path)=>{if(entry.isSymbolicLink())link(path);if(!entry.isFile()&&!entry.isDirectory())refuse(path,'is not a regular file.');};
  const walk=rel=>{for(const entry of readdirSync(join(root,rel),{withFileTypes:true})){const path=`${rel}/${entry.name}`;kind(entry,path);if(entry.isDirectory())walk(path);else files.push(path);}};
- // Code in a tools/ folder is a code tool, which needs the interpreter sandbox.
  const code=rel=>{
   let hit;
   for(const entry of readdirSync(join(root,rel),{withFileTypes:true}).sort((a,b)=>bytewise(a.name,b.name))){
@@ -497,11 +630,14 @@ function collect(root){
   }
   return hit;
  };
- const noCode=rel=>{const hit=code(rel);if(hit)refuse(hit,'is code in a tools/ folder. Code tools need the interpreter sandbox, which this version of cvm does not build; declare the tool as a custom tool in AGENT.md\'s tools, or move the file out of tools/.');};
+ const noCode=rel=>{const hit=code(rel);if(hit)refuse(hit,'is code in a tools/ folder. Code tools need the interpreter sandbox, which this version of cvm does not build; declare the tool as a custom tool in agent.json, or move the file out of tools/.');};
+ const modernSubs=new Set(),legacySubs=new Set();
  for(const entry of readdirSync(root,{withFileTypes:true})){
   const name=entry.name,shown=entry.isDirectory()?name+'/':name;
-  if(name==='AGENT.md'){kind(entry,name);if(entry.isDirectory())refuse(name,'is a folder; AGENT.md is the agent file.');files.push(name);continue;}
-  if(!['skills','agents','evals','tools'].includes(name)){excluded.push(shown);continue;}
+  if(format==='instructions'&&name==='instructions.md'){kind(entry,name);if(entry.isDirectory())refuse(name,'is a folder; instructions.md is the prompt file.');files.push(name);continue;}
+  if(format==='instructions'&&name==='agent.json'){kind(entry,name);if(entry.isDirectory())refuse(name,'is a folder; agent.json is the agent config file.');files.push(name);continue;}
+  if(format==='legacy'&&name==='AGENT.md'){kind(entry,name);if(entry.isDirectory())refuse(name,'is a folder; AGENT.md is the agent file.');files.push(name);continue;}
+  if(!['skills','subagents','agents','evals','tools'].includes(name)){excluded.push(shown);continue;}
   if(entry.isSymbolicLink())link(name);
   if(!entry.isDirectory()){excluded.push(shown);continue;}
   if(name==='tools'){
@@ -523,46 +659,72 @@ function collect(root){
     continue;
    }
    if(child.isSymbolicLink())link(path);
-   if(!child.isDirectory()||!isFile(join(root,path,name==='skills'?'SKILL.md':'AGENT.md'))){excluded.push(childShown);continue;}
-   if(name==='agents'&&existsSync(join(root,path,'tools'))&&lstatSync(join(root,path,'tools')).isDirectory())noCode(`${path}/tools`);
+   if(name==='skills'){
+    if(!child.isDirectory()||!isFile(join(root,path,'SKILL.md'))){excluded.push(childShown);continue;}
+    walk(path);
+    continue;
+   }
+   if(name==='subagents'){
+    const hasSubInstr=child.isDirectory()&&isFile(join(root,path,'instructions.md'));
+    const hasSubLegacy=child.isDirectory()&&isFile(join(root,path,'AGENT.md'));
+    if(!hasSubInstr&&!hasSubLegacy){excluded.push(childShown);continue;}
+    if(hasSubInstr&&hasSubLegacy)refuse(path,'holds both instructions.md and AGENT.md; keep instructions.md (+ optional agent.json).');
+    if(existsSync(join(root,path,'tools'))&&lstatSync(join(root,path,'tools')).isDirectory())noCode(`${path}/tools`);
+    modernSubs.add(child.name);
+    walk(path);
+    continue;
+   }
+   // Legacy agents/<name>/AGENT.md
+   if(!child.isDirectory()||!isFile(join(root,path,'AGENT.md'))){excluded.push(childShown);continue;}
+   if(existsSync(join(root,path,'tools'))&&lstatSync(join(root,path,'tools')).isDirectory())noCode(`${path}/tools`);
+   legacySubs.add(child.name);
    walk(path);
   }
  }
+ for(const sub of modernSubs)if(legacySubs.has(sub))refuse(`subagents/${sub}`,`also exists under legacy agents/${sub}; keep subagents/${sub}/ only.`);
  return {files:files.sort(bytewise),excluded:excluded.sort(bytewise)};
 }
 
 // build reads source (from locate) into the build: the manifest, agent.json's
 // text and digest, and every file's text.
 export function build(source){
- const listed=source.kind==='file'?{files:['AGENT.md'],excluded:[]}:collect(source.root);
- if(listed.files.length>LIMITS.files)throw usage(`The build has ${listed.files.length} files; the most is ${LIMITS.files.toLocaleString('en-US')} besides agent.json.`);
- let total=0;
- const files=listed.files.map(path=>{
-  const at=source.kind==='file'?source.file:join(source.root,...path.split('/'));
-  const max=path==='AGENT.md'?LIMITS.agentFile:LIMITS.file,st=lstatSync(at);
-  if(st.size>max)throw usage(`${path} is ${size(st.size)}, over the ${size(max)} one ${path==='AGENT.md'?'agent file':'file'} may be.`);
+ const format=source.format??'legacy';
+ const listed=source.kind==='file'?{files:['AGENT.md'],excluded:[]}:collect(source.root,format);
+ const readText=(path,at,max)=>{
+  const st=lstatSync(at);
+  if(st.size>max)throw usage(`${path} is ${size(st.size)}, over the ${size(max)} one ${max===LIMITS.agentFile?'agent file':'file'} may be.`);
   if(Buffer.byteLength(path)>512||/[\\\u0000-\u001f\u007f]/.test(path))throw usage(`${path}: a build's paths are at most 512 bytes, with no backslash and no control character. Rename it.`);
   const bytes=readFileSync(at);let text;
   try{text=utf8.decode(bytes);}catch{throw usage(`${path} is not UTF-8 text; a build holds text files only.`);}
   if(text.includes('\0'))throw usage(`${path} is not text (it holds a NUL byte); a build holds text files only.`);
-  total+=bytes.length;
-  if(total>LIMITS.total)throw usage(`The build is over ${size(LIMITS.total)} at ${path}; the most a build may be is ${size(LIMITS.total)}.`);
   return {path,text,bytes:bytes.length,sha256:sha256(bytes)};
+ };
+ const rawFiles=listed.files.map(path=>{
+  const at=source.kind==='file'?source.file:join(source.root,...path.split('/'));
+  const max=(path==='AGENT.md'||path==='instructions.md'||path==='agent.json')?LIMITS.agentFile:LIMITS.file;
+  return readText(path,at,max);
  });
- const agentFile=files.find(f=>f.path==='AGENT.md');
- if(!agentFile.text.trim())throw usage('AGENT.md is empty: it holds the agent\'s instructions.');
- const fields=agentFields(agentFile.text,source.kind==='file'?source.label:'AGENT.md');
+ const byPath=new Map(rawFiles.map(f=>[f.path,f]));
+
+ let fields,instructionsText;
+ if(format==='instructions'){
+  const instr=byPath.get('instructions.md');
+  if(!instr||!instr.text.trim())throw usage('instructions.md is empty: it holds the agent\'s instructions.');
+  instructionsText=instr.text;
+  const cfg=byPath.get('agent.json');
+  fields=cfg?parseAgentConfig(cfg.text,'agent.json'):{sandbox:{tier:'linux',computer:'full'},tools:[]};
+ }else{
+  const agentFile=byPath.get('AGENT.md');
+  if(!agentFile||!agentFile.text.trim())throw usage('AGENT.md is empty: it holds the agent\'s instructions.');
+  fields=agentFields(agentFile.text,source.kind==='file'?source.label:'AGENT.md');
+ }
  const fallback=source.kind==='file'?basename(source.file).replace(/\.md$/i,''):basename(source.root);
  const name=fields.name??fallback;
- if(!NAME.test(name))throw usage(`The agent's name would be ${JSON.stringify(name)}, from its ${source.kind==='file'?'file':'folder'} name, which is not one: name it in AGENT.md's frontmatter (name: ...), 1 to 100 letters, digits, ".", "_" or "-".`);
- const named=(prefix,anchor)=>listed.files.filter(path=>path.startsWith(prefix)&&path.endsWith('/'+anchor)&&path.split('/').length===3).map(path=>({name:path.split('/')[1],path}));
- const skills=named('skills/','SKILL.md'),subagents=named('agents/','AGENT.md');
- for(const skill of skills)if(!SKILL.test(skill.name))throw usage(`skills/${skill.name}/: a skill's folder name is its name: 1 to 64 lowercase letters, digits or "-", starting with a letter or digit. Rename the folder.`);
- for(const agent of subagents)if(!NAME.test(agent.name))throw usage(`agents/${agent.name}/: a subagent's folder name is its name: 1 to 100 letters, digits, ".", "_" or "-". Rename the folder.`);
- const evals=listed.files.filter(path=>path.startsWith('evals/')).map(path=>({name:EVAL.exec(path.slice(6))[1],path}));
- for(const item of evals)if(item.name.length>200)throw usage(`${item.path}: an eval's name (its file name) is at most 200 characters.`);
+ if(!NAME.test(name))throw usage(`The agent's name would be ${JSON.stringify(name)}, from its ${source.kind==='file'?'file':'folder'} name, which is not one: name it in ${format==='instructions'?'agent.json':'AGENT.md\'s frontmatter'} ("name": ...), 1 to 100 letters, digits, ".", "_" or "-".`);
+
+ // Build code tools first so auto-upgraded sandbox tier is known before synthesizing AGENT.md.
  const codeTools=listed.files.filter(path=>path.startsWith('tools/')&&path.split('/').length===2).map(path=>{
-  const file=files.find(f=>f.path===path),base=path.slice(6),ext=base.slice(base.lastIndexOf('.')+1).toLowerCase();
+  const file=byPath.get(path),base=path.slice(6),ext=base.slice(base.lastIndexOf('.')+1).toLowerCase();
   const toolName=base.slice(0,base.lastIndexOf('.'));
   if(!TOOL.test(toolName))throw usage(`${path}: a code tool's filename must be 1 to 64 letters, digits, "_" or "-", starting with a letter.`);
   const runtime=ext==='py'?'python':'js';
@@ -582,20 +744,94 @@ export function build(source){
   }
   return spec;
  });
+
+ let tier=fields.sandbox?.tier??(fields.computer==='none'?'none':fields.computer==='code'?'code':'linux');
+ let effectiveComputer=fields.sandbox?.computer??(tier==='linux'?'full':tier);
+ if(tier==='none'&&codeTools.length){
+  const hasPython=codeTools.some(t=>t.runtime==='python');
+  tier=hasPython?'linux':'code';
+  effectiveComputer=hasPython?'full':'code';
+ }
+
+ // Compile output files: synthesize AGENT.md for instructions.md + agent.json roots and subagents/<name>/.
+ const compiledMap=new Map();
+ const putFile=(path,text)=>{
+  const bytes=Buffer.from(text,'utf8');
+  compiledMap.set(path,{path,text,bytes:bytes.length,sha256:sha256(bytes)});
+ };
+ if(format==='instructions'){
+  putFile('AGENT.md',synthesizeAgentMD(name,effectiveComputer,fields.model??'',instructionsText,{description:fields.description??'',engine:fields.engine??''}));
+ }else{
+  compiledMap.set('AGENT.md',byPath.get('AGENT.md'));
+ }
+
+ // Compile subagents/<name>/ folders into subagents/<name>/AGENT.md.
+ const modernSubNames=new Set();
+ for(const p of listed.files){
+  const parts=p.split('/');
+  if(parts[0]==='subagents'&&parts.length===3&&(parts[2]==='instructions.md'||parts[2]==='AGENT.md'))modernSubNames.add(parts[1]);
+ }
+ const subagents=[];
+ for(const subName of [...modernSubNames].sort(bytewise)){
+  if(!NAME.test(subName))throw usage(`subagents/${subName}/: a subagent's folder name is its name: 1 to 100 letters, digits, ".", "_" or "-". Rename the folder.`);
+  const instrFile=byPath.get(`subagents/${subName}/instructions.md`);
+  const legacyFile=byPath.get(`subagents/${subName}/AGENT.md`);
+  const outPath=`subagents/${subName}/AGENT.md`;
+  if(instrFile){
+   if(!instrFile.text.trim())throw usage(`subagents/${subName}/instructions.md is empty.`);
+   const subCfg=byPath.get(`subagents/${subName}/agent.json`);
+   const subFields=subCfg?parseAgentConfig(subCfg.text,`subagents/${subName}/agent.json`):{sandbox:{tier:'linux',computer:'full'},tools:[]};
+   const subComp=subFields.sandbox?.computer??(subFields.computer==='none'?'none':subFields.computer==='code'?'code':subFields.computer==='readonly'?'readonly':'full');
+   putFile(outPath,synthesizeAgentMD(subFields.name??subName,subComp,subFields.model??'',instrFile.text,{description:subFields.description??'',engine:subFields.engine??''}));
+  }else if(legacyFile){
+   compiledMap.set(outPath,legacyFile);
+  }
+  subagents.push({name:subName,path:outPath});
+ }
+
+ // Copy remaining included files (skills/**, tools/*, evals/*, legacy agents/**, extra files under subagents/**).
+ for(const f of rawFiles){
+  if(f.path==='AGENT.md'||f.path==='instructions.md'||f.path==='agent.json')continue;
+  const parts=f.path.split('/');
+  if(parts[0]==='subagents'&&parts.length===3&&(parts[2]==='instructions.md'||parts[2]==='agent.json'||parts[2]==='AGENT.md'))continue;
+  compiledMap.set(f.path,f);
+ }
+
+ const files=[...compiledMap.values()].sort((a,b)=>bytewise(a.path,b.path));
+ if(files.length>LIMITS.files)throw usage(`The build has ${files.length} files; the most is ${LIMITS.files.toLocaleString('en-US')} besides agent.json.`);
+ let total=0;
+ for(const f of files){
+  total+=f.bytes;
+  if(total>LIMITS.total)throw usage(`The build is over ${size(LIMITS.total)} at ${f.path}; the most a build may be is ${size(LIMITS.total)}.`);
+ }
+
+ const named=(prefix,anchor)=>files.map(f=>f.path).filter(path=>path.startsWith(prefix)&&path.endsWith('/'+anchor)&&path.split('/').length===3).map(path=>({name:path.split('/')[1],path}));
+ const skills=named('skills/','SKILL.md'),legacySubagents=named('agents/','AGENT.md');
+ for(const skill of skills)if(!SKILL.test(skill.name))throw usage(`skills/${skill.name}/: a skill's folder name is its name: 1 to 64 lowercase letters, digits or "-", starting with a letter or digit. Rename the folder.`);
+ for(const agent of legacySubagents)if(!NAME.test(agent.name))throw usage(`agents/${agent.name}/: a subagent's folder name is its name: 1 to 100 letters, digits, ".", "_" or "-". Rename the folder.`);
+ const evals=files.map(f=>f.path).filter(path=>path.startsWith('evals/')).map(path=>({name:EVAL.exec(path.slice(6))[1],path}));
+ for(const item of evals)if(item.name.length>200)throw usage(`${item.path}: an eval's name (its file name) is at most 200 characters.`);
+
  const allTools=[...fields.tools,...codeTools];
- const allSubagents=[...subagents,...(fields.subagents??[])];
- let tier=fields.computer==='none'?'none':fields.computer==='code'?'code':'linux';
- if(tier==='none'&&codeTools.length)tier=codeTools.some(t=>t.runtime==='python')?'linux':'code';
+ const allSubagents=[...subagents,...legacySubagents,...(fields.subagents??[])];
+ const sandboxObj={tier};
+ if(tier==='linux'){
+  if(fields.sandbox?.size)sandboxObj.size=fields.sandbox.size;
+  if(fields.sandbox?.network)sandboxObj.network=fields.sandbox.network;
+  if(fields.sandbox?.keep)sandboxObj.keep=fields.sandbox.keep;
+ }
+ const loopObj=fields.image?{kind:'container',image:fields.image,protocol:'invocations.v1',...(fields.port?{port:fields.port}:{})}:{kind:'managed',...(fields.engine?{engine:fields.engine}:{})};
  const manifest={
   schema:'caveman.agent.build.v1',name,
   ...(fields.description?{description:fields.description}:{}),
-  loop:{kind:'managed',...(fields.engine?{engine:fields.engine}:{})},
+  loop:loopObj,
   ...(fields.model?{model:fields.model}:{}),
-  sandbox:{tier},
+  sandbox:sandboxObj,
   ...(allTools.length?{tools:allTools}:{}),
   ...(skills.length?{skills}:{}),
   ...(allSubagents.length?{subagents:allSubagents}:{}),
   ...(evals.length?{evals}:{}),
+  ...(fields.secrets?.length?{secrets:fields.secrets}:{}),
   ...(fields.connectors?{connectors:fields.connectors}:{}),
   ...(fields.budgets?{budgets:fields.budgets}:{}),
   ...(fields.drives?{drives:fields.drives}:{}),
@@ -653,7 +889,7 @@ export async function agentBuild(argv){
   try{({values,positionals}=parseArgs({args:argv,strict:true,allowPositionals:true,options:{out:{type:'string'},format:{type:'string'},help:{type:'boolean',short:'h'}}}));}
   catch(error){throw usage(`${error.message} Use ${buildUsage}.`);}
   format=formatOf(values);
-  if(values.help){process.stdout.write(inertJSON({usage:buildUsage,summary:'Build an agent folder (AGENT.md, skills/, agents/, evals/) or one agent file into the agent build output: agent.json and the files it lists. Prints each file, the total and the digest. No network; --out writes the build folder, else nothing is written.'},format==='table'?2:undefined)+'\n');return 0;}
+  if(values.help){process.stdout.write(inertJSON({usage:buildUsage,summary:'Build an agent folder (instructions.md, agent.json, tools/, skills/, subagents/, evals/) or legacy AGENT.md into the agent build output: agent.json and the files it lists. Prints each file, the total and the digest. No network; --out writes the build folder, else nothing is written.'},format==='table'?2:undefined)+'\n');return 0;}
   if(positionals.length>1)throw usage(`Name one agent. Use ${buildUsage}.`);
   const b=build(locate(positionals[0]));
   if(values.out)writeBuild(b,resolve(values.out));

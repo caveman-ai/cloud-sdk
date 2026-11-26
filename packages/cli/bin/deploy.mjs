@@ -63,7 +63,7 @@ async function command(argv,{options,usage:line,summary,what},body){
 }
 const client=async(context,timeout=30000)=>new CloudClient({...await context(),timeout});
 // Pads columns two spaces apart.
-const table=rows=>{
+export const table=rows=>{
  const widths=rows.reduce((w,row)=>row.map((cell,i)=>Math.max(w[i]??0,String(cell).length)),[]);
  return rows.map(row=>row.map((cell,i)=>i===row.length-1?String(cell):String(cell).padEnd(widths[i])).join('  ').trimEnd()).join('\n')+'\n';
 };
@@ -102,7 +102,7 @@ async function archivedName(api,name,error){
  if(error?.code!=='cave_conflict')throw error;
  let archived=[];
  try{archived=(await api.request('/api/v1/code/agents?archived=true')).agents??[];}catch{throw error;}
- if(archived.some(agent=>agent?.name===name&&agent.archived_at))throw own('cave_code_agent_archived',`The agent ${name} is archived, so its name is taken. Deploy under another agent name: set name in AGENT.md's frontmatter.`,4);
+ if(archived.some(agent=>agent?.name===name&&agent.archived_at))throw own('cave_code_agent_archived',`The agent ${name} is archived, so its name is taken. Deploy under another agent name: set name in agent.json (or AGENT.md).`,4);
  throw error;
 }
 

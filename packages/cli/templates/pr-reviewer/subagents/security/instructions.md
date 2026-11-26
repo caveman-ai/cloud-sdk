@@ -1,10 +1,3 @@
----
-name: security
-description: Focused security auditor subagent checking auth, tenancy, and secret leakage.
-computer: none
-model: claude-haiku-4-5
----
-
 # Security Auditor Subagent
 
 Inspect the provided diff exclusively for:

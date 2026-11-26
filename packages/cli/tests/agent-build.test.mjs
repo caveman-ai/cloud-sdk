@@ -138,7 +138,7 @@ test('with no path: the folder\'s AGENT.md, else the one agent under .caveman/ag
  assert.equal(error.code,'cave_usage');assert.match(error.message,/More than one agent under \.caveman\/agents\/: a\/, b\.md\./);
  const none=await folder(t,{'README.md':'x\n'},{name:'none'});
  result=await run(['agent','build'],none);
- assert.equal(result.code,2);assert.match(JSON.parse(result.stdout).error.message,/No AGENT\.md/);
+ assert.equal(result.code,2);assert.match(JSON.parse(result.stdout).error.message,/No instructions\.md or AGENT\.md/);
 });
 
 const refused=async(t,files,pattern,prepare)=>{
@@ -379,4 +379,73 @@ test('help answers without a sign-in or a request',async t=>{
  const family=await run(['agent','--help','--format','json'],dir);
  assert.ok(JSON.parse(family.stdout).verbs.some(v=>v.verb==='build'));
  assert.ok(relative(dir,bin).length>0);
+});
+
+test('canonical instructions.md + agent.json + subagents/ folder compiles deterministically to caveman.agent.build.v1',async t=>{
+ const dir=await folder(t,{
+  'instructions.md':'# Support Triage\n\nAnswer concisely and cite /kb.\n',
+  'agent.json':JSON.stringify({
+   $schema:'https://docs.caveman.so/schemas/agent.json',
+   name:'support-triage',
+   description:'Durable support agent',
+   model:'anthropic/claude-sonnet-4-6',
+   sandbox:'none',
+   secrets:['STRIPE_API_KEY'],
+   connectors:{linear:{tools:['list_issues','create_issue'],after_untrusted:'approve'}},
+   drives:{'/kb':'support-kb'},
+   schedules:{daily:{cron:'0 9 * * 1-5',task:'Summarize P0s'}},
+   channels:{slack:{events:['app_mention'],thread_mode:'session'}},
+  },null,2),
+  'skills/refunds/SKILL.md':'# Refunds\nWithin 30 days.\n',
+  'subagents/security/instructions.md':'# Security\nCheck auth.\n',
+  'subagents/security/agent.json':JSON.stringify({name:'security',sandbox:'none',model:'claude-haiku-4-5'}),
+  'evals/basic.eval.json':'{"name":"basic"}\n',
+ });
+ const b=build(locate(dir));
+ assert.equal(b.name,'support-triage');
+ assert.deepEqual(b.manifest.sandbox,{tier:'none'});
+ assert.deepEqual(b.manifest.secrets,['STRIPE_API_KEY']);
+ assert.deepEqual(b.manifest.subagents,[{name:'security',path:'subagents/security/AGENT.md'}]);
+ assert.deepEqual(b.manifest.skills,[{name:'refunds',path:'skills/refunds/SKILL.md'}]);
+ assert.deepEqual(b.manifest.evals,[{name:'basic',path:'evals/basic.eval.json'}]);
+ const synthRoot=b.files.find(f=>f.path==='AGENT.md').text;
+ assert.match(synthRoot,/^---\nname: support-triage\ndescription: "Durable support agent"\ncomputer: none\nmodel: anthropic\/claude-sonnet-4-6\n---\n# Support Triage/);
+ const synthSub=b.files.find(f=>f.path==='subagents/security/AGENT.md').text;
+ assert.match(synthSub,/^---\nname: security\ncomputer: none\nmodel: claude-haiku-4-5\n---\n# Security/);
+ schemaValid(b.manifest);
+
+ // Passing ./dir/instructions.md or ./dir/agent.json resolves the whole folder.
+ assert.equal(build(locate(join(dir,'instructions.md'))).digest,b.digest);
+ assert.equal(build(locate(join(dir,'agent.json'))).digest,b.digest);
+});
+
+test('instructions.md alone (zero config), ./agent/ auto-discovery, and smart model-friendly suggestions work cleanly',async t=>{
+ const zero=await folder(t,{'instructions.md':'# Helper\nBe concise.\n'},{name:'my-helper'});
+ const b=build(locate(zero));
+ assert.equal(b.name,'my-helper');
+ assert.deepEqual(b.manifest.sandbox,{tier:'linux'});
+ schemaValid(b.manifest);
+
+ const appRepo=await folder(t,{'agent/instructions.md':'# App Agent\nHelp users.\n','agent/agent.json':'{"name":"app-agent","sandbox":"code"}'},{name:'my-app'});
+ const located=locate(undefined,appRepo);
+ assert.equal(located.label,'agent/');
+ assert.equal(build(located).name,'app-agent');
+
+ const both=await folder(t,{'instructions.md':'# A\n','AGENT.md':'# B\n'});
+ assert.throws(()=>locate(both),e=>e.exitCode===2&&/holds both instructions\.md and legacy AGENT\.md/.test(e.message));
+
+ const typo=await folder(t,{'instructions.md':'# A\n','agent.json':'{"models":"anthropic/claude-sonnet-4-6"}'});
+ assert.throws(()=>build(locate(typo)),e=>e.exitCode===2&&/unknown key "models"\. Did you mean "model"\?/.test(e.message));
+
+ const promptKey=await folder(t,{'instructions.md':'# A\n','agent.json':'{"instructions":"Be nice"}'});
+ assert.throws(()=>build(locate(promptKey)),e=>e.exitCode===2&&/Put the system prompt in instructions\.md next to agent\.json/.test(e.message));
+
+ const dupSB=await folder(t,{'instructions.md':'# A\n','agent.json':'{"sandbox":"none","computer":"none"}'});
+ assert.throws(()=>build(locate(dupSB)),e=>e.exitCode===2&&/set sandbox or computer, not both/.test(e.message));
+
+ const validConfig=ajv.compile(JSON.parse(await readFile(new URL('../../../contracts/schemas/agent-config.schema.json',import.meta.url),'utf8')));
+ for(const rel of ['ask/agent.json','pr-reviewer/agent.json','pr-reviewer/subagents/security/agent.json','researcher-drive/agent.json','support-slack/agent.json','ts-tools/agent.json']){
+  const cfg=JSON.parse(await readFile(new URL(`../templates/${rel}`,import.meta.url),'utf8'));
+  assert.ok(validConfig(cfg),`${rel}: ${JSON.stringify(validConfig.errors)}`);
+ }
 });

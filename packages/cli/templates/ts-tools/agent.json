@@ -1,0 +1,7 @@
+{
+  "$schema": "https://docs.caveman.so/schemas/agent.json",
+  "name": "ts-tools",
+  "description": "Agent combining deterministic QuickJS code tools with durable approvals.",
+  "sandbox": "code",
+  "model": "claude-sonnet-5-5"
+}

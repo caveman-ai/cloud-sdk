@@ -1,0 +1,264 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://caveman.so/schemas/agent-config.schema.json",
+  "title": "Caveman Agent Configuration (agent.json)",
+  "description": "Declarative configuration for a Caveman Managed Agent folder alongside instructions.md. Zero runtime dependencies; compiled deterministically into caveman.agent.build.v1 by cvm and Git deploys.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "JSON Schema URI for editor autocomplete and validation (e.g. https://docs.caveman.so/schemas/agent.json)."
+    },
+    "name": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$",
+      "description": "Agent name. Defaults to the folder name when omitted."
+    },
+    "description": {
+      "type": "string",
+      "maxLength": 500,
+      "description": "Short description of what this agent does."
+    },
+    "model": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200,
+      "description": "Default model id (e.g. anthropic/claude-sonnet-4-6) or routing alias (caveman/auto)."
+    },
+    "engine": {
+      "enum": ["caveman", "claude-agent", "codex"],
+      "description": "Managed harness engine. Defaults to caveman."
+    },
+    "sandbox": {
+      "description": "Execution sandbox tier: none (no compute), code (QuickJS code-tool interpreter), linux / full / readonly (Firecracker microVM), or an object with tier, size, network, and keep.",
+      "oneOf": [
+        {
+          "enum": ["none", "code", "linux", "full", "readonly"]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["tier"],
+          "properties": {
+            "tier": { "enum": ["none", "code", "linux"] },
+            "size": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]?cpu-[1-9][0-9]{0,3}gb$"
+            },
+            "network": { "enum": ["none", "internet"] },
+            "keep": { "enum": ["session", "subject"] }
+          }
+        }
+      ]
+    },
+    "computer": {
+      "enum": ["none", "code", "linux", "full", "readonly"],
+      "description": "Deprecated alias for sandbox. Use sandbox instead."
+    },
+    "image": {
+      "type": "string",
+      "maxLength": 500,
+      "pattern": "^[a-z0-9][a-z0-9._/:-]*@sha256:[0-9a-f]{64}$",
+      "description": "Optional digest-pinned OCI image for custom container loop escape hatch (invocations.v1)."
+    },
+    "port": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 65535,
+      "description": "Container HTTP port for custom container loop."
+    },
+    "tools": {
+      "type": "array",
+      "maxItems": 256,
+      "description": "Built-in tool names or caller-answered custom tool definitions. Executable code tools live in tools/*.{ts,js,mjs,py}.",
+      "items": {
+        "oneOf": [
+          {
+            "type": "string",
+            "pattern": "^[A-Za-z][A-Za-z0-9_-]{0,63}$"
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["type", "name", "description", "input_schema"],
+            "properties": {
+              "type": { "const": "custom" },
+              "name": { "type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_-]{0,63}$" },
+              "description": { "type": "string", "minLength": 1, "maxLength": 4000 },
+              "input_schema": { "type": "object" }
+            }
+          }
+        ]
+      }
+    },
+    "connectors": {
+      "description": "Organization OAuth/MCP connectors this agent may call. List of connector names or map from connector name to tool/approval policies.",
+      "oneOf": [
+        {
+          "type": "array",
+          "maxItems": 32,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9]*(-[a-z0-9]+)*$",
+            "maxLength": 32
+          }
+        },
+        {
+          "type": "object",
+          "maxProperties": 32,
+          "propertyNames": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9]*(-[a-z0-9]+)*$",
+            "maxLength": 32
+          },
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "tools": {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 200,
+                "uniqueItems": true,
+                "items": { "type": "string", "minLength": 1, "maxLength": 128 }
+              },
+              "as": {
+                "oneOf": [
+                  { "enum": ["shared", "user", "end_user"] },
+                  {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["read", "write"],
+                    "properties": {
+                      "read": { "enum": ["shared", "user", "end_user"] },
+                      "write": { "enum": ["shared", "user", "end_user"] }
+                    }
+                  }
+                ]
+              },
+              "args": {
+                "type": "object",
+                "maxProperties": 16,
+                "additionalProperties": {
+                  "type": ["string", "number", "boolean"]
+                }
+              },
+              "approve": {
+                "type": "array",
+                "uniqueItems": true,
+                "items": { "type": "string", "minLength": 1, "maxLength": 128 }
+              },
+              "unpinned": {
+                "type": "array",
+                "uniqueItems": true,
+                "items": { "type": "string", "minLength": 1, "maxLength": 128 }
+              },
+              "after_untrusted": {
+                "enum": ["allow", "approve", "deny"]
+              }
+            }
+          }
+        }
+      ]
+    },
+    "drives": {
+      "type": "object",
+      "maxProperties": 8,
+      "description": "Durable Drive mounts by path (e.g. /kb -> support-kb, or /work -> { drive, folder, write, review }).",
+      "propertyNames": {
+        "type": "string",
+        "pattern": "^/[a-z0-9][a-z0-9_-]{0,62}$"
+      },
+      "additionalProperties": {
+        "oneOf": [
+          {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9-]{0,62}$"
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["drive"],
+            "properties": {
+              "drive": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]{0,62}$" },
+              "folder": { "type": "string", "minLength": 1, "maxLength": 1024 },
+              "write": { "type": "boolean" },
+              "review": { "type": "boolean" },
+              "trusted": { "type": "boolean" },
+              "description": { "type": "string", "maxLength": 200 }
+            }
+          }
+        ]
+      }
+    },
+    "secrets": {
+      "type": "array",
+      "maxItems": 64,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^[A-Z][A-Z0-9_]{0,63}$"
+      },
+      "description": "Write-only KMS secret names injected per command (values never live in agent.json)."
+    },
+    "budgets": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "tools": {
+          "type": "integer",
+          "minimum": 100,
+          "maximum": 100000,
+          "description": "Maximum tokens allowed for connector tool cards."
+        }
+      }
+    },
+    "output_schema": {
+      "type": "object",
+      "description": "Optional JSON Schema constraining the agent's final structured output."
+    },
+    "schedules": {
+      "type": "object",
+      "maxProperties": 32,
+      "description": "Declarative cron schedules that start sessions on this deployment.",
+      "propertyNames": {
+        "type": "string",
+        "pattern": "^[a-z0-9][a-z0-9-]{0,62}$"
+      },
+      "additionalProperties": {
+        "type": "object",
+        "required": ["cron", "task"],
+        "properties": {
+          "cron": { "type": "string", "minLength": 1 },
+          "task": { "type": "string", "minLength": 1 },
+          "timezone": { "type": "string" },
+          "concurrency": { "enum": ["allow", "skip", "queue"] },
+          "budget_usd": { "type": "number", "exclusiveMinimum": 0 }
+        }
+      }
+    },
+    "channels": {
+      "type": "object",
+      "maxProperties": 16,
+      "description": "Inbound and outbound channel bindings (slack, github, linear, jira, webhook, web, discord, teams).",
+      "additionalProperties": { "type": "object" }
+    },
+    "subagents": {
+      "type": "array",
+      "maxItems": 64,
+      "description": "Remote deployment delegations. Bundled subagents live in subagents/<name>/instructions.md.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "deployment"],
+        "properties": {
+          "name": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$" },
+          "deployment": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]{0,62}$" },
+          "output_schema": { "type": "object" }
+        }
+      }
+    }
+  }
+}
