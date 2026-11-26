@@ -283,11 +283,32 @@ function resolveSandbox(front,line,fail){
 }
 
 const formatYAMLScalar=s=>PLAIN_SCALAR.test(s)?s:JSON.stringify(s);
-export function synthesizeAgentMD(name,computer,model,instructions){
- const lines=['---',`name: ${formatYAMLScalar(name)}`,`computer: ${computer}`];
+export function synthesizeAgentMD(name,computer,model,instructions,{description='',engine=''}={}){
+ const lines=['---',`name: ${formatYAMLScalar(name)}`];
+ if(description)lines.push(`description: ${formatYAMLScalar(description)}`);
+ if(engine)lines.push(`engine: ${formatYAMLScalar(engine)}`);
+ lines.push(`computer: ${computer}`);
  if(model)lines.push(`model: ${formatYAMLScalar(model)}`);
  lines.push('---');
  return `${lines.join('\n')}\n${instructions}`;
+}
+
+function editDistance(a,b){
+ const m=a.length,n=b.length,dp=Array.from({length:m+1},(_,i)=>Array.from({length:n+1},(_,j)=>i===0?j:j===0?i:0));
+ for(let i=1;i<=m;i++)for(let j=1;j<=n;j++)dp[i][j]=a[i-1]===b[j-1]?dp[i-1][j-1]:1+Math.min(dp[i-1][j],dp[i][j-1],dp[i-1][j-1]);
+ return dp[m][n];
+}
+function suggestConfigKey(key){
+ const low=key.toLowerCase();
+ if(['instructions','prompt','system','system_prompt','systemprompt'].includes(low))return ' Put the system prompt in instructions.md next to agent.json.';
+ if(low==='budget')return ' Did you mean "budgets" (or pass --budget USD to cvm deploy)?';
+ let best='',bestDist=3;
+ for(const candidate of CONFIG_KEYS){
+  if(candidate==='$schema')continue;
+  const d=editDistance(low,candidate);
+  if(d<bestDist){bestDist=d;best=candidate;}
+ }
+ return best?` Did you mean ${JSON.stringify(best)}?`:'';
 }
 
 // Validate normalized config fields from either agent.json or legacy AGENT.md frontmatter.
@@ -390,7 +411,7 @@ export function parseAgentConfig(text,file='agent.json'){
  if(!isMap(parsed))throw usage(`${file}: must be a JSON object.`);
  if(parsed.schema==='caveman.agent.build.v1')throw usage(`${file}: looks like a compiled caveman.agent.build.v1 manifest, not a source agent config.`);
  for(const key of Object.keys(parsed)){
-  if(!CONFIG_KEYS.includes(key))throw usage(`${file}: unknown key ${JSON.stringify(key)}. Allowed keys: ${CONFIG_KEYS.join(', ')}.`);
+  if(!CONFIG_KEYS.includes(key))throw usage(`${file}: unknown key ${JSON.stringify(key)}.${suggestConfigKey(key)} Allowed keys: ${CONFIG_KEYS.join(', ')}.`);
  }
  const front={...parsed};
  Object.defineProperty(front,'lineOf',{value:()=>1});
@@ -567,7 +588,7 @@ export function locate(path,cwd=process.cwd()){
   try{st=lstatSync(at);}catch{throw usage(`${path} does not exist.`);}
   if(st.isSymbolicLink()){st=statSync(at,{throwIfNoEntry:false});if(!st?.isDirectory())throw usage(`${path} is a symlink; name the agent file itself.`);}
   if(st.isDirectory())return checkFolder(at,path);
-  if(st.isFile()&&basename(at)==='agent.json'&&isFile(join(dirname(at),'instructions.md'))){
+  if(st.isFile()&&(basename(at)==='agent.json'||basename(at)==='instructions.md')&&isFile(join(dirname(at),'instructions.md'))){
    return checkFolder(dirname(at),dirname(path));
   }
   if(!st.isFile()||!/\.md$/i.test(at))throw usage(`${path} is not an agent. Name a folder that holds instructions.md (+ optional agent.json), legacy AGENT.md, or one agent file (*.md).`);
@@ -739,7 +760,7 @@ export function build(source){
   compiledMap.set(path,{path,text,bytes:bytes.length,sha256:sha256(bytes)});
  };
  if(format==='instructions'){
-  putFile('AGENT.md',synthesizeAgentMD(name,effectiveComputer,fields.model??'',instructionsText));
+  putFile('AGENT.md',synthesizeAgentMD(name,effectiveComputer,fields.model??'',instructionsText,{description:fields.description??'',engine:fields.engine??''}));
  }else{
   compiledMap.set('AGENT.md',byPath.get('AGENT.md'));
  }
@@ -761,7 +782,7 @@ export function build(source){
    const subCfg=byPath.get(`subagents/${subName}/agent.json`);
    const subFields=subCfg?parseAgentConfig(subCfg.text,`subagents/${subName}/agent.json`):{sandbox:{tier:'linux',computer:'full'},tools:[]};
    const subComp=subFields.sandbox?.computer??(subFields.computer==='none'?'none':subFields.computer==='code'?'code':subFields.computer==='readonly'?'readonly':'full');
-   putFile(outPath,synthesizeAgentMD(subFields.name??subName,subComp,subFields.model??'',instrFile.text));
+   putFile(outPath,synthesizeAgentMD(subFields.name??subName,subComp,subFields.model??'',instrFile.text,{description:subFields.description??'',engine:subFields.engine??''}));
   }else if(legacyFile){
    compiledMap.set(outPath,legacyFile);
   }
