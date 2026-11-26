@@ -19,7 +19,7 @@ const (
 	MaxKeyBytes     = 1024
 )
 
-// Protected folders and files match cloud/control-api/internal/drivepath.Protected:
+// Protected folders and files mirror Caveman Drive's server-side protected set:
 // paths that tools, shells, editors, or coding agents auto-execute or obey from
 // the directory they find them in. Checked at EVERY path depth so neither
 // /.git/config nor /CLAUDE.md/sub can sneak past.
