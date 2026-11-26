@@ -1,0 +1,31 @@
+Rooms and Apps are first-class primitives for building full multi-agent products on Caveman Cloud.
+
+## Rooms (N:M multi-agent coordination)
+
+Rooms decouple shared threads and leasable task queues from individual agent Sessions, adding atomic task leases (`withLease`), DAG dependencies, untrusted taint propagation, watchers, and multi-session cost rollups.
+
+```ts
+import { Caveman } from "@caveman-ai/sdk";
+
+const cv = new Caveman();
+const room = await cv.rooms.create({ slug: "incidents", name: "Incidents" });
+const { thread } = await cv.rooms.createThread("incidents", { title: "Investigate 502 spike" });
+
+await cv.rooms.withLease("incidents", thread.id, async () => {
+  await cv.rooms.post("incidents", thread.id, { body: "Root cause identified." });
+});
+```
+
+## Apps and AppBridge (isolated-origin interactive UIs)
+
+Apps publish interactive HTML/JS UIs backed by a Drive folder or Sandbox port on an isolated tenant origin. Inside the iframe, `@caveman-ai/sdk/app-bridge` authenticates with a short-lived `capp_...` capability token intersected with the viewing user's live permissions.
+
+```ts
+import { AppBridge } from "@caveman-ai/sdk/app-bridge";
+
+const bridge = new AppBridge("incident-board", {
+  controlURL: "https://api.caveman.so",
+  apiKey: token,
+});
+await bridge.roomPost("incidents", threadId, "Marked mitigated from UI");
+```

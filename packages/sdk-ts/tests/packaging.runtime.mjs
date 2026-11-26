@@ -15,6 +15,10 @@ test("package publishes only built runtime, types, license, and README", () => {
       types: "./dist/index.d.ts",
       default: "./dist/index.js",
     },
+    "./app-bridge": {
+      types: "./dist/app-bridge.d.ts",
+      default: "./dist/app-bridge.js",
+    },
     "./evals": {
       types: "./dist/evals.d.ts",
       default: "./dist/evals.js",
@@ -72,7 +76,9 @@ test("package publishes only built runtime, types, license, and README", () => {
 test("every entry point loads from CommonJS require() as well as import", async () => {
   const { createRequire } = await import("node:module");
   const require = createRequire(import.meta.url);
+  assert.equal(typeof require("@caveman-ai/sdk").Caveman, "function");
   assert.equal(typeof require("@caveman-ai/sdk").Cave, "function");
+  assert.equal(typeof require("@caveman-ai/sdk/app-bridge").AppBridge, "function");
   assert.equal(typeof require("@caveman-ai/sdk/cloud").Cloud, "function");
   assert.equal(typeof require("@caveman-ai/sdk/agents").Agents, "function");
   assert.equal(typeof require("@caveman-ai/sdk/sandboxes").Sandboxes, "function");

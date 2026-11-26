@@ -3201,3 +3201,27 @@ function sha256HexBytes(bytes: Uint8Array): string {
   }
   return Array.from(h, (value) => value.toString(16).padStart(8, "0")).join("");
 }
+
+export {
+  Caveman,
+  ConnectorsClient,
+  CreditsClient,
+  DEFAULT_CONTROL_URL,
+  DEFAULT_GATEWAY_URL,
+  DriveHandle,
+  DrivesClient,
+  EvalsClient,
+  InferenceClient,
+  ManagedAgentsClient,
+  SecretsClient,
+  SessionsClient,
+  type CavemanOptions,
+  type ConnectorSummary,
+  type ModelCatalogEntry,
+  type SecretMetadata,
+} from "./caveman.js";
+export { Cloud, CloudError } from "./cloud.js";
+export { Agents } from "./agents.generated.js";
+export { Sandboxes } from "./sandboxes.js";
+export { AppBridge, Apps, PlatformError, Rooms } from "./platform2027.js";
+
