@@ -51,8 +51,34 @@ from .platform2027 import (
     WorkflowUncertainEffectError,
 )
 from .sandboxes import ExecResult, SandboxCommand, SandboxConnection, Sandboxes, SandboxError, SandboxExecError, SandboxFileError, SandboxFileInfo, SandboxPortURL, SandboxRefusal, SandboxStateError, SnapshotStateError
+from .caveman import (
+    Caveman,
+    ConnectorsClient,
+    CreditsClient,
+    DEFAULT_CONTROL_URL,
+    DEFAULT_GATEWAY_URL,
+    DriveHandle,
+    DrivesClient,
+    EvalsClient,
+    InferenceClient,
+    ManagedAgentsClient,
+    SecretsClient,
+    SessionsClient,
+)
 
 __all__ = [
+    "Caveman",
+    "ConnectorsClient",
+    "CreditsClient",
+    "DEFAULT_CONTROL_URL",
+    "DEFAULT_GATEWAY_URL",
+    "DriveHandle",
+    "DrivesClient",
+    "EvalsClient",
+    "InferenceClient",
+    "ManagedAgentsClient",
+    "SecretsClient",
+    "SessionsClient",
     "Agents",
     "AppBridge",
     "Apps",

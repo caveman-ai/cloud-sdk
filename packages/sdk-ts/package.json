@@ -1,7 +1,7 @@
 {
   "name": "@caveman-ai/sdk",
   "version": "2.0.0",
-  "description": "Zero-dependency TypeScript client for Caveman gateway tracing, tool deferral, checkpoints, and recoverable compression.",
+  "description": "Zero-dependency TypeScript SDK for Caveman Cloud: Inference, Managed Agents, Sessions, Sandboxes, Drives, Connectors, Secrets, Rooms, Apps, and Evals.",
   "license": "MIT",
   "type": "module",
   "main": "dist/index.js",
@@ -10,6 +10,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
+    },
+    "./app-bridge": {
+      "types": "./dist/app-bridge.d.ts",
+      "default": "./dist/app-bridge.js"
     },
     "./evals": {
       "types": "./dist/evals.d.ts",

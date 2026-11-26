@@ -1,4 +1,4 @@
-`@caveman-ai/sdk` is a zero-dependency TypeScript client supporting both ESM `import` and CommonJS `require()`.
+`@caveman-ai/sdk` is a zero-dependency TypeScript SDK supporting ESM `import` and CommonJS `require()`.
 
 ## Install
 
@@ -6,13 +6,26 @@
 npm install @caveman-ai/sdk
 ```
 
+## Unified client
+
+```ts
+import { Caveman } from "@caveman-ai/sdk";
+
+const cv = new Caveman(); // reads CAVEMAN_API_KEY or CAVE_TOKEN
+
+const models = await cv.inference.models();
+const hits = await cv.drives.drive("knowledge").grep({ pattern: "SLA" });
+const sb = await cv.sandboxes.create({ name: "runner" });
+const session = await cv.agents.run("triage", { request_id: "req-1", task: "Check alerts" });
+const rooms = await cv.rooms.list();
+```
+
 ## Entrypoints
 
-| Subpath | Exports | Purpose |
+| Subpath | Primary exports | Purpose |
 |---|---|---|
-| `@caveman-ai/sdk` | `Cave`, `OTelExporter`, `CaveRequestError` | Gateway proxy, tracing, prefix assembly, tool search, checkpoints |
-| `@caveman-ai/sdk/cloud` | `Cloud`, `CloudError` | Typed generated client for all 389 Cloud control-plane operations |
-| `@caveman-ai/sdk/agents` | `Agents` | Agents API sessions, streaming events, file uploads |
-| `@caveman-ai/sdk/sandboxes` | `Sandboxes` | Firecracker sandbox lifecycle, exec streams, file copy, snapshots |
-| `@caveman-ai/sdk/evals` | `Eval`, eval clients | Dataset/experiment authoring, runs, baseline verdicts |
-| `@caveman-ai/sdk/router` | `RouterClient` | Caveman Router `/v1/route` and `/v1/task` client |
+| `@caveman-ai/sdk` | `Caveman`, `Cave`, `Sandboxes`, `Rooms`, `Apps`, `Gate`, `Cloud` | Unified Cloud client (`inference`, `agents`, `sessions`, `sandboxes`, `drives`, `connectors`, `secrets`, `rooms`, `apps`, `evals`, `approvals`, `credits`) |
+| `@caveman-ai/sdk/app-bridge` | `AppBridge` | Minimal browser-iframe bridge client using short-lived `capp_...` capability tokens |
+| `@caveman-ai/sdk/sandboxes` | `Sandboxes` | Standalone Firecracker sandbox lifecycle, exec streams, snapshots, and ports |
+| `@caveman-ai/sdk/evals` | `Eval`, `EvalWorkbenchClient` | Datasets, scorers, experiments, and CI gates |
+| `@caveman-ai/sdk/router` | `RouterClient` | Model-routing `/v1/route` client |

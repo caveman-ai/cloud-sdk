@@ -1,21 +1,23 @@
-`caveman-sdk` is a zero-dependency Python 3.13+ client (imported as `caveman_cloud`) with full type annotations (`py.typed`) and a companion LiteLLM connector.
+`caveman-sdk` is a zero-dependency (stdlib-only) Python 3.13+ SDK imported as `caveman_cloud`.
 
 ## Install
 
 ```bash
-pip install https://github.com/caveman-ai/cloud-sdk/releases/download/v2.0.0/caveman_sdk-2.0.0-py3-none-any.whl
+pip install caveman-sdk
 ```
 
-## Gateway tracing & Cloud client
+## Unified client
 
 ```python
-from caveman_cloud import Cave, Cloud
+from caveman_cloud import Caveman
 
-cave = Cave(api_key=os.environ["CAVE_API_KEY"], gateway_url="https://gateway.caveman.so")
-cloud = Cloud(control_url="https://api.caveman.so", token=os.environ["CAVE_TOKEN"])
-projects = cloud.projects.list()
+cv = Caveman()  # reads CAVEMAN_API_KEY or CAVE_TOKEN
+
+models = cv.inference.models()
+hits = cv.drives.drive("knowledge").grep({"pattern": "SLA"})
+secrets = cv.secrets.list()  # metadata only, never values
+rooms = cv.rooms.list()
+credits = cv.credits.get()
 ```
 
-## LiteLLM connector
-
-The `python/caveman-litellm` package plugs into LiteLLM proxy callbacks to forward routing decisions and trace metadata through Caveman.
+All ten Cloud primitives are exposed on the same client instance (`inference`, `agents`, `sessions`, `sandboxes`, `drives`, `connectors`, `secrets`, `rooms`, `apps`, `evals`, `approvals`, `credits`).

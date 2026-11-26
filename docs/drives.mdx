@@ -1,0 +1,24 @@
+Caveman Drives are durable, org-scoped, versioned long-term filesystems separate from ephemeral Sandboxes. Agents and apps read, edit, grep, and diff Drive files without booting a VM, mount Drives into Sandboxes or locally via `cvm drive mount`, and hold untrusted writes as human-reviewable changesets.
+
+## Use from the unified SDK
+
+```ts
+import { Caveman } from "@caveman-ai/sdk";
+
+const cv = new Caveman();
+const kb = cv.drives.drive("knowledge");
+
+await kb.write({ path: "/runbooks/refunds.md", content: "# Refunds\n..." });
+const hits = await kb.grep({ pattern: "refund" });
+const pending = await kb.changesets({ status: "pending" });
+```
+
+## Use from the CLI
+
+```bash
+cvm drive create knowledge
+cvm drive put ./runbooks knowledge/runbooks
+cvm drive grep "refund" knowledge/
+cvm drive review knowledge
+cvm drive mount knowledge ~/caveman-knowledge
+```
