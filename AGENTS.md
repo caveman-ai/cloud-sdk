@@ -49,3 +49,11 @@ node --test skills/budget.test.mjs
 - **Cross-language parity.** Wire changes update `contracts/` and parity fixtures alongside TS, Python, and Go implementations; missing handlers fail closed.
 - **Generated contracts.** `contracts/openapi.json` and `contracts/operations.public.json` are sanitized exports from Caveman Cloud's API contract — keep client generation deterministic and never hand-edit generated files without updating their source.
 - **Scoped conventional commits** (`feat(sdk-ts): ...`, `fix(cli): ...`, `docs(repo): ...`).
+
+## Workflow
+
+- Work in a clean branch or worktree off `origin/main`; never commit or push directly to `main`.
+- Stage explicit paths (`git commit --only -- <paths>`), never `git add -A`.
+- Run `node scripts/check-public-hygiene.mjs` and the checks above before pushing.
+- Open a pull request against `main` and squash-merge once CI is green.
+- Releases run through `.github/workflows/release.yml` on `v*` tags (or manual dispatch on a green `main` commit).
