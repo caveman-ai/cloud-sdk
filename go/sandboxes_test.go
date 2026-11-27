@@ -1177,6 +1177,7 @@ func TestSandboxesWaitForAState(t *testing.T) {
 // decides; a Caveman Cloud that answers no Cave-Wait is polled from then on; at the API's cap on one
 // caller's waits, the read is a plain one.
 func TestSandboxesWaitIsHeldByTheAPI(t *testing.T) {
+	t.Parallel()
 	w := loadWire(t)
 	base := sandboxOf(t, w.Rest["get"].Answer)
 	type answer struct {
@@ -1187,6 +1188,7 @@ func TestSandboxesWaitIsHeldByTheAPI(t *testing.T) {
 	var mu sync.Mutex
 	var asked []string
 	var answers []answer
+	clock := time.Unix(1_700_000_000, 0)
 	code := "" // every answer's observed_reason_code while set
 	srv := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
 		mu.Lock()
@@ -1196,8 +1198,8 @@ func TestSandboxesWaitIsHeldByTheAPI(t *testing.T) {
 		if len(answers) > 1 {
 			answers = answers[1:]
 		}
+		clock = clock.Add(a.after)
 		mu.Unlock()
-		time.Sleep(a.after)
 		rw.Header().Set("Content-Type", "application/json")
 		if a.status == http.StatusTooManyRequests && r.URL.Query().Has("wait_for") {
 			rw.Header().Set("Retry-After", "0")
@@ -1222,6 +1224,11 @@ func TestSandboxesWaitIsHeldByTheAPI(t *testing.T) {
 	}
 	var paused []time.Duration
 	s.pause = func(_ context.Context, d time.Duration) error { paused = append(paused, d); return nil }
+	s.now = func() time.Time {
+		mu.Lock()
+		defer mu.Unlock()
+		return clock
+	}
 	run := func(ctx context.Context, set []answer) ([]string, CodeComputer, error) {
 		t.Helper()
 		mu.Lock()

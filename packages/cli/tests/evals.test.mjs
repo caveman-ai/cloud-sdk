@@ -1,6 +1,6 @@
-import test from 'node:test';
+import test, {describe} from 'node:test';
 import assert from 'node:assert/strict';
-import {spawnSync} from 'node:child_process';
+import {spawn} from 'node:child_process';
 import {mkdtempSync,readFileSync,writeFileSync,existsSync} from 'node:fs';
 import {createRequire} from 'node:module';
 import {tmpdir} from 'node:os';
@@ -9,6 +9,7 @@ import {fileURLToPath} from 'node:url';
 import {CloudError} from '../dist/cloud-client.mjs';
 import {validateEvalFile,runEvalFile,renderReport,evalJUnit,exitFor,pick,commitScope} from '../bin/evals.mjs';
 import {connect,VERSION_CONFLICT} from '../bin/ci.mjs';
+import {TEST_CONCURRENCY,limitSpawn,mapPool} from './pool.mjs';
 
 const cvm=fileURLToPath(new URL('../bin/cvm.mjs',import.meta.url));
 const schema=JSON.parse(readFileSync(new URL('../../../contracts/schemas/eval-file.schema.json',import.meta.url),'utf8'));
@@ -19,8 +20,11 @@ const paths=doc=>validateEvalFile(doc).map(error=>error.path);
 
 function cli(args,{cwd,env={}}={}){
  const base={...process.env};for(const key of ['CAVE_TOKEN','CAVE_API_URL','CAVE_PROJECT_ID','CAVE_CONSOLE_URL','GITHUB_EVENT_PATH','GITHUB_REF','GITHUB_SHA','GITHUB_BASE_REF'])delete base[key];
- const result=spawnSync(process.execPath,[cvm,...args],{cwd,encoding:'utf8',env:{...base,HOME:cwd,USERPROFILE:cwd,CAVEMAN_HOME:join(cwd,'.caveman'),CAVE_NO_KEYCHAIN:'1',...env}});
- return {code:result.status,stdout:result.stdout,stderr:result.stderr,lines:result.stdout.trim().split('\n').filter(Boolean).map(line=>{try{return JSON.parse(line);}catch{return line;}})};
+ return limitSpawn(()=>new Promise((resolve,reject)=>{
+  const child=spawn(process.execPath,[cvm,...args],{cwd,env:{...base,HOME:cwd,USERPROFILE:cwd,CAVEMAN_HOME:join(cwd,'.caveman'),CAVE_NO_KEYCHAIN:'1',...env},stdio:['ignore','pipe','pipe']});
+  let stdout='',stderr='';child.stdout.on('data',d=>stdout+=d);child.stderr.on('data',d=>stderr+=d);
+  child.on('error',reject);child.on('close',code=>resolve({code,stdout,stderr,lines:stdout.trim().split('\n').filter(Boolean).map(line=>{try{return JSON.parse(line);}catch{return line;}})}));
+ }));
 }
 
 test('every validation error names its JSON path',()=>{
@@ -388,9 +392,11 @@ test('JUnit has a test case per case and criterion, and one for the gate',async(
  assert.match(evalJUnit([{...report,status:'no_baseline',exit_code:0,sentence:'No baseline.'}]),/name="Gate"><skipped message="No baseline."\/>/);
 });
 
-test('cvm: init writes a starter the next commands accept, and a dry run runs its task with nothing sent',()=>{
+describe('evals-cli', {concurrency: TEST_CONCURRENCY}, () => {
+
+test('cvm: init writes a starter the next commands accept, and a dry run runs its task with nothing sent',async()=>{
  const cwd=mkdtempSync(join(tmpdir(),'cvm-evals-'));
- const init=cli(['evals','init'],{cwd});
+ const init=await cli(['evals','init'],{cwd});
  assert.equal(init.code,0,init.stdout+init.stderr);
  assert.deepEqual(init.lines[0],{schema_version:1,ok:true,file:'example.eval.json',next:['cvm evals validate example.eval.json','cvm evals run example.eval.json --set-baseline-on-pass','cvm evals ci example.eval.json']});
  const starter=JSON.parse(readFileSync(join(cwd,'example.eval.json'),'utf8'));
@@ -398,98 +404,118 @@ test('cvm: init writes a starter the next commands accept, and a dry run runs it
  assert.deepEqual(validateEvalFile(starter),[]);
  // Three cases can never read a pass under the statistical gate (it needs about 30), so the starter's is strict; and it names a budget, which a CI key's run must.
  assert.deepEqual([starter.gate,typeof starter.budget_usd],[{policy:'strict'},'number']);
- assert.match(cli(['evals','init','other.eval.json','--format','table'],{cwd}).stdout,/Its gate is strict[\s\S]*about 30 cases/);
- assert.equal(cli(['evals','init'],{cwd}).code,4,'an existing file is never overwritten');
+ const [otherInit,dupInit,checked,dry,table]=await Promise.all([
+  cli(['evals','init','other.eval.json','--format','table'],{cwd}),
+  cli(['evals','init'],{cwd}),
+  cli(['evals','validate','example.eval.json','--offline'],{cwd}),
+  cli(['evals','run','example.eval.json','--dry-run','--trials','2'],{cwd}),
+  cli(['evals','run','example.eval.json','--dry-run','--format','table'],{cwd}),
+ ]);
+ assert.match(otherInit.stdout,/Its gate is strict[\s\S]*about 30 cases/);
+ assert.equal(dupInit.code,4,'an existing file is never overwritten');
  // Offline validation and a dry run need no sign-in and no server.
- const checked=cli(['evals','validate','example.eval.json','--offline'],{cwd});
  assert.deepEqual([checked.code,checked.lines[0].status,checked.lines[0].checked],[0,'valid','schema']);
- // Graders and judge questions name nothing in the project, so the starter validates signed out too.
- assert.equal(cli(['evals','validate','*.eval.json'],{cwd}).code,0);
- const dry=cli(['evals','run','example.eval.json','--dry-run','--trials','2'],{cwd});
  assert.equal(dry.code,0,dry.stdout+dry.stderr);
  assert.deepEqual([dry.lines[0].status,dry.lines[0].outputs.length,dry.lines[0].outputs[0]],['dry_run',6,{row_key:'refund',trial:1,attempts:1,latency_ms:dry.lines[0].outputs[0].latency_ms,output:'You asked: How do I get a refund?'}]);
- const table=cli(['evals','run','example.eval.json','--dry-run','--format','table'],{cwd});
  assert.match(table.stdout,/^example: Dry run\n\n3 cases\ncase      Task ran\n/);
+ // Graders and judge questions name nothing in the project, so the starter validates signed out too.
+ assert.equal((await cli(['evals','validate','*.eval.json'],{cwd})).code,0);
  // A library criterion is looked up in the project, which needs a sign-in: the client's own exit code.
  writeFileSync(join(cwd,'library.eval.json'),JSON.stringify({...starter,criteria:['Grounded']}));
- for(const args of [['evals','validate','library.eval.json'],['evals','run','library.eval.json']]){
-  const signedOut=cli(args,{cwd,env:{CAVE_PROJECT_ID:'00000000-0000-4000-8000-000000000001'}});
+ const [valOut,runOut,offlineLib]=await Promise.all([
+  cli(['evals','validate','library.eval.json'],{cwd,env:{CAVE_PROJECT_ID:'00000000-0000-4000-8000-000000000001'}}),
+  cli(['evals','run','library.eval.json'],{cwd,env:{CAVE_PROJECT_ID:'00000000-0000-4000-8000-000000000001'}}),
+  cli(['evals','validate','library.eval.json','--offline'],{cwd}),
+ ]);
+ for(const signedOut of [valOut,runOut]){
   assert.equal(signedOut.code,3,signedOut.stdout);
   assert.match(signedOut.stdout,/cave_auth_required/);
  }
- assert.equal(cli(['evals','validate','library.eval.json','--offline'],{cwd}).code,0);
+ assert.equal(offlineLib.code,0);
 });
 
-test('cvm: the task is a command with its input on stdin; a non-zero exit, a timeout and a missing program are task errors',()=>{
+test('cvm: the task is a command with its input on stdin; a non-zero exit, a timeout and a missing program are task errors',async()=>{
  const cwd=mkdtempSync(join(tmpdir(),'cvm-evals-'));
  const file=(name,command,task={})=>{writeFileSync(join(cwd,name),JSON.stringify({name,dataset:{cases:[{id:'a',input:{n:2}},{id:'b',input:{n:3}}]},task:{command,retries:0,...task},criteria:[{type:'contains',fragments:['x']}]}));return name;};
- const run=name=>cli(['evals','run',name,'--dry-run'],{cwd}).lines[0];
- const doubled=run(file('json.eval.json',[process.execPath,'-e','let s="";process.stdin.on("data",d=>s+=d).on("end",()=>console.log(JSON.stringify({twice:JSON.parse(s).n*2})))']));
+ const run=async name=>(await cli(['evals','run',name,'--dry-run'],{cwd})).lines[0];
+ const [doubled,failing,slow,missing]=await Promise.all([
+  run(file('json.eval.json',[process.execPath,'-e','let s="";process.stdin.on("data",d=>s+=d).on("end",()=>console.log(JSON.stringify({twice:JSON.parse(s).n*2})))'])),
+  run(file('fail.eval.json',[process.execPath,'-e','console.error("no key");process.exit(3)'],{retries:1})),
+  run(file('slow.eval.json',[process.execPath,'-e','setTimeout(()=>{},30000)'],{timeout_seconds:0.3})),
+  run(file('missing.eval.json',['cvm-no-such-program'])),
+ ]);
  assert.deepEqual(doubled.outputs.map(output=>output.output),[{twice:4},{twice:6}]);
- const failing=run(file('fail.eval.json',[process.execPath,'-e','console.error("no key");process.exit(3)'],{retries:1}));
  assert.deepEqual([failing.status,failing.exit_code,failing.outputs[0].attempts,failing.outputs[0].error],['incomplete',6,2,'exit 3: no key']);
  assert.match(failing.sentence,/failed on 2 of 2 runs/);
- const slow=run(file('slow.eval.json',[process.execPath,'-e','setTimeout(()=>{},30000)'],{timeout_seconds:0.3}));
  assert.equal(slow.outputs[0].error,'the task took longer than 0.3 s');
- assert.match(run(file('missing.eval.json',['cvm-no-such-program'])).outputs[0].error,/^could not run cvm-no-such-program/);
+ assert.match(missing.outputs[0].error,/^could not run cvm-no-such-program/);
 });
 
-test('cvm: an invalid file exits 2 with its paths and nothing runs; a partial or dry run cannot set a baseline',()=>{
+test('cvm: an invalid file exits 2 with its paths and nothing runs; a partial or dry run cannot set a baseline',async()=>{
  const cwd=mkdtempSync(join(tmpdir(),'cvm-evals-'));
- cli(['evals','init','good.eval.json'],{cwd});
+ await cli(['evals','init','good.eval.json'],{cwd});
  const marker=join(cwd,'ran');
  writeFileSync(join(cwd,'runs.eval.json'),JSON.stringify({name:'runs',dataset:{cases:[{id:'a',input:1}]},task:{command:[process.execPath,'-e',`require('fs').writeFileSync(${JSON.stringify(marker)},'')`]},criteria:[{type:'contains',fragments:['x']}]}));
  writeFileSync(join(cwd,'bad.eval.json'),JSON.stringify({name:'bad',dataset:{cases:[{id:'a'}]},task:{command:['true']},criteria:[]}));
  writeFileSync(join(cwd,'broken.eval.json'),'{name:');
- for(const args of [['evals','validate','good.eval.json','bad.eval.json','broken.eval.json','--offline'],['evals','run','runs.eval.json','bad.eval.json','broken.eval.json','--dry-run'],['evals','ci','runs.eval.json','bad.eval.json','broken.eval.json','--dry-run']]){
-  const result=cli(args,{cwd});
-  assert.equal(result.code,2,result.stdout+result.stderr);
-  const bad=result.lines.find(line=>line.file==='bad.eval.json'),broken=result.lines.find(line=>line.file==='broken.eval.json');
-  assert.deepEqual(bad.errors.map(error=>error.path),['$.dataset.cases[0].input','$.criteria']);
-  assert.deepEqual([bad.status,bad.exit_code,broken.errors[0].path],['invalid',2,'$']);
-  assert.match(broken.errors[0].message,/^is not JSON: /);
- }
- assert.ok(!existsSync(marker),'no task ran beside an invalid file');
- assert.match(cli(['evals','validate','bad.eval.json','--offline','--format','table'],{cwd}).stdout,/^bad: Invalid\n  bad\.eval\.json: \$\.dataset\.cases\[0\]\.input: is required\n/);
- for(const flags of [['--first','1'],['--sample','1','--seed','3'],['--dry-run']]){
-  const refused=cli(['evals','run','good.eval.json','--set-baseline-on-pass',...flags],{cwd});
-  assert.deepEqual([refused.code,refused.lines[0].error.code],[2,'cave_usage']);
-  assert.match(refused.lines[0].error.message,/cannot become a baseline/);
- }
- assert.equal(cli(['evals','run','good.eval.json','--first','1','--sample','1'],{cwd}).code,2);
- assert.equal(cli(['evals','run','good.eval.json','--trials','11'],{cwd}).code,2);
- assert.equal(cli(['evals','run','none-*.eval.json'],{cwd}).code,2);
- // A usage error is an invalid call (exit 2), never the gate's "failed".
- const usage=cli(['evals','run','good.eval.json','--first','0'],{cwd}).lines[0];
- assert.deepEqual([usage.ok,usage.status,usage.exit_code,usage.error.code],[false,'invalid',2,'cave_usage']);
- // --project takes its id in either form without becoming the operation `evals run EXPERIMENT_ID`.
  const project='123e4567-e89b-42d3-a456-426614174000';
- for(const flag of [['--project',project],[`--project=${project}`]]){
-  assert.deepEqual([cli(['evals','validate','good.eval.json','--offline',...flag],{cwd}).lines[0].status,cli(['evals','run','good.eval.json','--dry-run',...flag],{cwd}).lines[0].status],['valid','dry_run']);
- }
- // The operation forms keep their own path: a manifest by --file, a run by its experiment's id.
- assert.equal(cli(['evals','validate','--file','good.eval.json'],{cwd}).lines.length>0,true);
- assert.notEqual(cli(['evals','run','00000000-0000-4000-8000-000000000001','--idempotency-key','k'],{cwd}).lines[0]?.error?.code,'cave_usage');
+ await Promise.all([
+  mapPool([['evals','validate','good.eval.json','bad.eval.json','broken.eval.json','--offline'],['evals','run','runs.eval.json','bad.eval.json','broken.eval.json','--dry-run'],['evals','ci','runs.eval.json','bad.eval.json','broken.eval.json','--dry-run']],async args=>{
+   const result=await cli(args,{cwd});
+   assert.equal(result.code,2,result.stdout+result.stderr);
+   const bad=result.lines.find(line=>line.file==='bad.eval.json'),broken=result.lines.find(line=>line.file==='broken.eval.json');
+   assert.deepEqual(bad.errors.map(error=>error.path),['$.dataset.cases[0].input','$.criteria']);
+   assert.deepEqual([bad.status,bad.exit_code,broken.errors[0].path],['invalid',2,'$']);
+   assert.match(broken.errors[0].message,/^is not JSON: /);
+  }),
+  (async()=>{assert.match((await cli(['evals','validate','bad.eval.json','--offline','--format','table'],{cwd})).stdout,/^bad: Invalid\n  bad\.eval\.json: \$\.dataset\.cases\[0\]\.input: is required\n/);})(),
+  mapPool([['--first','1'],['--sample','1','--seed','3'],['--dry-run']],async flags=>{
+   const refused=await cli(['evals','run','good.eval.json','--set-baseline-on-pass',...flags],{cwd});
+   assert.deepEqual([refused.code,refused.lines[0].error.code],[2,'cave_usage']);
+   assert.match(refused.lines[0].error.message,/cannot become a baseline/);
+  }),
+  (async()=>{assert.equal((await cli(['evals','run','good.eval.json','--first','1','--sample','1'],{cwd})).code,2);})(),
+  (async()=>{assert.equal((await cli(['evals','run','good.eval.json','--trials','11'],{cwd})).code,2);})(),
+  (async()=>{assert.equal((await cli(['evals','run','none-*.eval.json'],{cwd})).code,2);})(),
+  (async()=>{
+   // A usage error is an invalid call (exit 2), never the gate's "failed".
+   const usage=(await cli(['evals','run','good.eval.json','--first','0'],{cwd})).lines[0];
+   assert.deepEqual([usage.ok,usage.status,usage.exit_code,usage.error.code],[false,'invalid',2,'cave_usage']);
+  })(),
+  // --project takes its id in either form without becoming the operation `evals run EXPERIMENT_ID`.
+  mapPool([['--project',project],[`--project=${project}`]],async flag=>{
+   const [v,r]=await Promise.all([cli(['evals','validate','good.eval.json','--offline',...flag],{cwd}),cli(['evals','run','good.eval.json','--dry-run',...flag],{cwd})]);
+   assert.deepEqual([v.lines[0].status,r.lines[0].status],['valid','dry_run']);
+  }),
+  // The operation forms keep their own path: a manifest by --file, a run by its experiment's id.
+  (async()=>{assert.equal((await cli(['evals','validate','--file','good.eval.json'],{cwd})).lines.length>0,true);})(),
+  (async()=>{assert.notEqual((await cli(['evals','run','00000000-0000-4000-8000-000000000001','--idempotency-key','k'],{cwd})).lines[0]?.error?.code,'cave_usage');})(),
+ ]);
+ assert.ok(!existsSync(marker),'no task ran beside an invalid file');
 });
 
-test('cvm evals ci takes eval files: each result carries the commit, and the JUnit report is written',()=>{
+test('cvm evals ci takes eval files: each result carries the commit, and the JUnit report is written',async()=>{
  const cwd=mkdtempSync(join(tmpdir(),'cvm-evals-'));
- cli(['evals','init','one.eval.json'],{cwd});cli(['evals','init','two.eval.json'],{cwd});
+ await Promise.all([cli(['evals','init','one.eval.json'],{cwd}),cli(['evals','init','two.eval.json'],{cwd})]);
  const env={GITHUB_SHA:'a'.repeat(40),GITHUB_REF:'refs/pull/12/merge',GITHUB_BASE_REF:'main',GITHUB_JOB:'evals'};
- const result=cli(['evals','ci','one.eval.json','two.eval.json','--dry-run','--junit-out','report.xml'],{cwd,env});
+ const [result,stdoutJunit,noArgs]=await Promise.all([
+  cli(['evals','ci','one.eval.json','two.eval.json','--dry-run','--junit-out','report.xml'],{cwd,env}),
+  cli(['evals','ci','one.eval.json','--dry-run','--junit-out','-'],{cwd,env}),
+  cli(['evals','ci'],{cwd}),
+ ]);
  assert.equal(result.code,0,result.stdout+result.stderr);
  assert.deepEqual(result.lines.map(line=>[line.file,line.status,line.ci]),['one.eval.json','two.eval.json'].map(file=>[file,'dry_run',{sha:'a'.repeat(40),ref:'refs/pull/12/merge',base_ref:'main',pr_number:12,event:'pull_request',job:'evals'}]));
  const junit=readFileSync(join(cwd,'report.xml'),'utf8');
  assert.equal(junit.match(/<testsuite /g).length,2);
  assert.match(junit,/<testcase classname="example" name="refund \/ Task ran"><\/testcase>/);
- assert.match(cli(['evals','ci','one.eval.json','--dry-run','--junit-out','-'],{cwd,env}).stdout,/^<\?xml[\s\S]*<testsuites>/);
+ assert.match(stdoutJunit.stdout,/^<\?xml[\s\S]*<testsuites>/);
  // The JUnit wrapper keeps its own usage.
- assert.equal(cli(['evals','ci'],{cwd}).code,2);
+ assert.equal(noArgs.code,2);
 });
 
 test('the three commands init prints end in exit 0 on an unchanged task: the first run saves the baseline and the next passes its strict gate',async()=>{
  const cwd=mkdtempSync(join(tmpdir(),'cvm-evals-'));
- cli(['evals','init'],{cwd});
+ await cli(['evals','init'],{cwd});
  const starter=JSON.parse(readFileSync(join(cwd,'example.eval.json'),'utf8')),echo=async(_,input)=>({output:'You asked: '+input.question});
  const first=fakeCloud({baseline:{experiment:null,project:null}});
  const saved=await runEvalFile('example.eval.json',starter,{...full,setBaseline:true,projectKey:true},{cloud:first.cloud,runOne:echo});
@@ -502,4 +528,6 @@ test('the three commands init prints end in exit 0 on an unchanged task: the fir
  client.execute=async(id,input,options)=>id==='evals.compare'?(next.calls.push({id,input}),{data:compared(stored()==='strict'?'passed':'need_more_data',stored())}):execute(id,input,options);
  const gated=await runEvalFile('example.eval.json',starter,{...full,projectKey:true},{cloud:next.cloud,runOne:echo});
  assert.deepEqual([gated.status,gated.exit_code,next.sent('evals.compare').policy,gated.gate.policy],['passed',0,undefined,'strict']);
+});
+
 });

@@ -56,6 +56,7 @@ type Sandboxes struct {
 	http, stream         *http.Client
 	retries              int
 	pause                func(context.Context, time.Duration) error
+	now                  func() time.Time
 	poll                 time.Duration
 }
 
@@ -89,7 +90,8 @@ func NewSandboxes(options SandboxesOptions) (*Sandboxes, error) {
 	return &Sandboxes{endpoint: endpoint + "/api/v1", relay: relay, key: options.APIKey, retries: retries, poll: time.Second,
 		http:   &http.Client{Timeout: timeout, Transport: options.Transport, CheckRedirect: noRedirect},
 		stream: &http.Client{Transport: options.Transport, CheckRedirect: noRedirect},
-		pause:  sleepContext}, nil
+		pause:  sleepContext,
+		now:    time.Now}, nil
 }
 
 func sandboxOrigin(raw string) (string, error) {
@@ -327,8 +329,12 @@ func (s *Sandboxes) Wait(ctx context.Context, sandboxID, state string) (CodeComp
 	deadline, _ := ctx.Deadline()
 	interval := s.poll / 2
 	waits := true // until an answer says the API does not
+	now := s.now
+	if now == nil {
+		now = time.Now
+	}
 	for {
-		asked := time.Now()
+		asked := now()
 		seconds := min(maxWaitSeconds, int(time.Until(deadline)/time.Second))
 		var c CodeComputer
 		var err error
@@ -356,7 +362,7 @@ func (s *Sandboxes) Wait(ctx context.Context, sandboxID, state string) (CodeComp
 		case outcome == "unreachable" || (outcome == "" && sandboxWaitEnds(c.ObservedState, sandboxText(c.ObservedReasonCode))) || !sandboxHeading(c.DesiredState, state):
 			return c, &SandboxStateError{SandboxID: sandboxID, Want: state, Observed: c.ObservedState, Desired: c.DesiredState,
 				Reason: sandboxText(c.ObservedReason), ReasonCode: sandboxText(c.ObservedReasonCode)}
-		case outcome != "" && time.Since(asked) >= time.Second && ctx.Err() == nil:
+		case outcome != "" && now().Sub(asked) >= time.Second && ctx.Err() == nil:
 			continue // the API held the read: ask again at once (an early answer of timeout waits as a poll)
 		}
 		interval = min(interval*2, 2*s.poll)

@@ -1,4 +1,4 @@
-import test from 'node:test';
+import test, {describe} from 'node:test';
 import assert from 'node:assert/strict';
 import {spawn,execFileSync} from 'node:child_process';
 import {createServer} from 'node:http';
@@ -12,6 +12,7 @@ import {deploy as deployVerb,failure} from '../bin/deploy.mjs';
 import {CloudError} from '../dist/cloud-client.mjs';
 import {build,locate,size,summaryLine} from '../bin/agent-build.mjs';
 import * as F from './fixtures/connectors.mjs';
+import {TEST_CONCURRENCY,limitSpawn,mapPool} from './pool.mjs';
 // Where git is: the system directories, or on Windows wherever the runner put it.
 const gitPath=process.platform==='win32'?process.env.PATH:'/usr/bin:/bin';
 
@@ -45,20 +46,22 @@ async function fixture(t,routes={}){
  t.after(async()=>{await new Promise(resolve=>server.close(resolve));await rm(home,{recursive:true,force:true});});
  await writeFile(join(home,'.caveman','cloud.json'),JSON.stringify({baseURL:url,tokenStore:'file'}));
  await writeFile(join(home,'.caveman','credentials'),JSON.stringify({access_token:secret}),{mode:0o600});
- const run=(args,env={})=>new Promise((resolve,reject)=>{
+ const run=(args,env={})=>limitSpawn(()=>new Promise((resolve,reject)=>{
   const child=spawn(process.execPath,[bin,...args],{cwd:home,env:{HOME:home,USERPROFILE:home,CAVEMAN_HOME:join(home,'.caveman'),PATH:gitPath,CAVE_NO_KEYCHAIN:'1',CAVE_NO_BROWSER:'1',...env},stdio:['ignore','pipe','pipe']});
   let stdout='',stderr='';child.stdout.on('data',d=>stdout+=d);child.stderr.on('data',d=>stderr+=d);
   child.on('error',reject);child.on('close',code=>{
    assert.ok(!(stdout+stderr).includes(secret),'must not print the credential');
    resolve({code,stdout,stderr,json:()=>JSON.parse(stdout)});
   });
- });
+ }));
  return {home,seen,url,run};
 }
 const agent=(version,build={})=>({id:agentId,organization_id:'org',name:'triage',version,summary:{name:'triage'},build:{sha256:'f'.repeat(64),bytes:900,files:3,loop:'managed',sandbox:'linux',requires:['skills'],blocked_by:[],...build}});
 const deployment=({revision=1,status='live',config={},blocked_by=[],version=1}={})=>({id:deploymentId,organization_id:'org',name:'triage',agent_id:agentId,agent_name:'triage',status,revision,
  live:{deployment_id:deploymentId,revision,agent:{id:agentId,version},config,trigger:'cli',commit_sha:null,branch:null,rolled_back_to:null,build:{sha256:'f'.repeat(64),bytes:900,files:3,loop:'managed',sandbox:'linux',requires:['skills'],blocked_by},created_at:'2026-11-18T10:00:00Z'},
  created_at:'2026-11-18T09:00:00Z',updated_at:'2026-11-18T10:00:00Z',archived_at:null});
+
+describe('deploy', {concurrency: TEST_CONCURRENCY}, () => {
 
 test('deploy: a new agent and a new deployment, printed as agent, version, files, size and digest, then the deployment and the run line',async t=>{
  const f=await fixture(t,{
@@ -129,9 +132,9 @@ test('deploy --dry-run builds, prints what it would send, and sends nothing',asy
  const table=await f.run(['deploy','triage','--dry-run','--format','table']);
  assert.match(table.stdout,/^dry run {2}nothing sent\. A deploy would:$/m);
  assert.deepEqual(f.seen,[]);
- for(const bad of [['--repo','acme'],['--budget','0'],['--budget','x'],['--name','Bad_Name'],['--model','two words']]){
+ await mapPool([['--repo','acme'],['--budget','0'],['--budget','x'],['--name','Bad_Name'],['--model','two words']],async bad=>{
   const refused=await f.run(['deploy','triage',...bad]);assert.equal(refused.code,2,refused.stdout);assert.equal(refused.json().error.code,'cave_usage');
- }
+ });
  assert.deepEqual(f.seen,[]);
 });
 
@@ -226,22 +229,26 @@ test('run --subject sends who the session is for, one folder name a value; a mal
  assert.deepEqual({...f.seen[0].body,request_id:undefined},{request_id:undefined,task:'Where is order 1042?',subject:{customer:'acme-42',region:'eu_west'}});
  const none=await f.run(['run','triage','Do it','--no-follow']);
  assert.equal(none.code,0);assert.ok(!('subject' in f.seen[1].body),'no --subject sends no subject');
- for(const [args,pattern] of [
-  [['--subject','customer'],/^--subject is NAME=VALUE/],
-  [['--subject','Customer=acme'],/^--subject is NAME=VALUE/],
-  [['--subject','customer=a/b'],/^--subject customer= is one folder name/],
-  [['--subject','customer=..'],/^--subject customer= is one folder name/],
-  [['--subject','customer='],/^--subject customer= is one folder name/],
-  [['--subject',`customer=${'x'.repeat(129)}`],/^--subject customer= is one folder name/],
-  [['--subject','customer=a','--subject','customer=b'],/^--subject names customer twice\.$/],
-  [Array.from({length:17},(_,i)=>['--subject',`k${i}=v`]).flat(),/^--subject is given at most 16 times\.$/],
- ]){
-  const refused=await f.run(['run','triage','Do it',...args]);
-  assert.equal(refused.code,2,refused.stdout);
-  assert.equal(refused.json().error.code,'cave_usage');assert.match(refused.json().error.message,pattern);
- }
- const follow=await f.run(['run','--session',sessionId,'--subject','customer=a']);
- assert.equal(follow.code,2);assert.match(follow.json().error.message,/takes no deployment, task, --subject or --no-follow/);
+ await Promise.all([
+  mapPool([
+   [['--subject','customer'],/^--subject is NAME=VALUE/],
+   [['--subject','Customer=acme'],/^--subject is NAME=VALUE/],
+   [['--subject','customer=a/b'],/^--subject customer= is one folder name/],
+   [['--subject','customer=..'],/^--subject customer= is one folder name/],
+   [['--subject','customer='],/^--subject customer= is one folder name/],
+   [['--subject',`customer=${'x'.repeat(129)}`],/^--subject customer= is one folder name/],
+   [['--subject','customer=a','--subject','customer=b'],/^--subject names customer twice\.$/],
+   [Array.from({length:17},(_,i)=>['--subject',`k${i}=v`]).flat(),/^--subject is given at most 16 times\.$/],
+  ],async([args,pattern])=>{
+   const refused=await f.run(['run','triage','Do it',...args]);
+   assert.equal(refused.code,2,refused.stdout);
+   assert.equal(refused.json().error.code,'cave_usage');assert.match(refused.json().error.message,pattern);
+  }),
+  (async()=>{
+   const follow=await f.run(['run','--session',sessionId,'--subject','customer=a']);
+   assert.equal(follow.code,2);assert.match(follow.json().error.message,/takes no deployment, task, --subject or --no-follow/);
+  })(),
+ ]);
  assert.equal(f.seen.length,2,'a refused --subject sends nothing');
 });
 
@@ -267,9 +274,9 @@ test('run: a quiet session ends the wait (not the session) with the command to w
  const again=await f.run(['run','--session',sessionId,'--format','table']);
  assert.equal(again.code,6,again.stdout);
  assert.match(again.stdout,/^waits {4}tool approve_refund: cvm cannot answer it$/m);
- for(const bad of [['run'],['run','triage'],['run','Bad/Name','x'],['run','--session','nope'],['run','--session',sessionId,'triage'],['run','triage','x','--timeout','0']]){
+ await mapPool([['run'],['run','triage'],['run','Bad/Name','x'],['run','--session','nope'],['run','--session',sessionId,'triage'],['run','triage','x','--timeout','0']],async bad=>{
   const refused=await f.run(bad);assert.equal(refused.code,2,`${bad.join(' ')}: ${refused.stdout}`);
- }
+ });
 });
 
 test('deployments: each command calls its route with its body; archive needs --yes',async t=>{
@@ -301,9 +308,9 @@ test('deployments: each command calls its route with its body; archive needs --y
  const count=f.seen.length;
  const unconfirmed=await f.run(['deployments','archive','triage']);
  assert.equal(unconfirmed.code,2);assert.equal(unconfirmed.json().error.code,'cave_confirmation_required');
- for(const bad of [['get'],['get','Bad_Name'],['rollback','triage','0'],['rollback','triage','two'],['pause','triage','--yes'],['get','triage','--archived'],['remove','triage'],['list','extra']]){
+ await mapPool([['get'],['get','Bad_Name'],['rollback','triage','0'],['rollback','triage','two'],['pause','triage','--yes'],['get','triage','--archived'],['remove','triage'],['list','extra']],async bad=>{
   const refused=await f.run(['deployments',...bad]);assert.equal(refused.code,2,`${bad.join(' ')}: ${refused.stdout}`);
- }
+ });
  assert.equal(f.seen.length,count,'nothing is sent for a refused command');
  const list=await f.run(['deployments','--format','table']);
  assert.match(list.stdout,/^NAME {4}STATUS {2}REVISION {2}AGENT {6}UPDATED$/m);
@@ -370,13 +377,15 @@ test('deploy: a create refused because an archived agent holds the name says so;
 
 test('help for each verb answers without a sign-in or a request',async t=>{
  const f=await fixture(t);
- for(const verb of ['deploy','run','deployments']){
-  const result=await f.run([verb,'--help']);
-  assert.equal(result.code,0,result.stdout);assert.match(result.json().usage,new RegExp(`^cvm ${verb} `));
- }
- const top=await f.run(['--help','--format','json']);
+ const [,top,screen]=await Promise.all([
+  Promise.all(['deploy','run','deployments'].map(async verb=>{
+   const result=await f.run([verb,'--help']);
+   assert.equal(result.code,0,result.stdout);assert.match(result.json().usage,new RegExp(`^cvm ${verb} `));
+  })),
+  f.run(['--help','--format','json']),
+  f.run(['--help','--format','table']),
+ ]);
  assert.equal(top.json().deploy,'cvm agent init ask [DIR] | cvm agent build [PATH] | cvm deploy [PATH] | cvm run NAME "TASK" | cvm deployments');
- const screen=await f.run(['--help','--format','table']);
  assert.match(screen.stdout,/\nDeploy\n  cvm agent init ask \[DIR\] +Ask Caveman: an agent that answers from your data\n  cvm agent build \[PATH\] +an agent folder to its build: files, size, digest\n  cvm deploy \[PATH\] +store the build and make it live under a name\n  cvm run NAME "TASK" +a session through a deployment, followed\n  cvm deployments +list, roll back, pause, resume or archive\n\nFamilies\n/);
  assert.deepEqual(f.seen,[]);
 });
@@ -685,4 +694,6 @@ test('a long refusal is cut at a word, with an ellipsis',()=>{
  assert.equal(refusal('Short and whole.'),'Short and whole.');
  const long=refusal('word '.repeat(200));
  assert.ok(long.length<=500&&long.endsWith('word…'),long.slice(-20));
+});
+
 });

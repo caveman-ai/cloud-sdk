@@ -1,4 +1,4 @@
-import test from 'node:test';
+import test, {describe} from 'node:test';
 import assert from 'node:assert/strict';
 import {spawn} from 'node:child_process';
 import {createHash} from 'node:crypto';
@@ -8,6 +8,7 @@ import {tmpdir} from 'node:os';
 import {join,dirname,relative} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {build,buildFiles,locate,readFrontmatter,agentFields,summaryLine,LIMITS} from '../bin/agent-build.mjs';
+import {TEST_CONCURRENCY,limitSpawn} from './pool.mjs';
 
 const bin=fileURLToPath(new URL('../bin/cvm.mjs',import.meta.url));
 const sha=text=>createHash('sha256').update(text).digest('hex');
@@ -39,16 +40,18 @@ async function folder(t,files,{name='triage',order}={}){
  for(const path of order??Object.keys(files)){await mkdir(dirname(join(dir,path)),{recursive:true});await writeFile(join(dir,path),files[path]);}
  return dir;
 }
-const run=(args,cwd,env={})=>new Promise((resolve,reject)=>{
+const run=(args,cwd,env={})=>limitSpawn(()=>new Promise((resolve,reject)=>{
  const child=spawn(process.execPath,[bin,...args],{cwd,env:{HOME:cwd,USERPROFILE:cwd,CAVEMAN_HOME:join(cwd,'.caveman-home'),PATH:'/usr/bin:/bin',CAVE_NO_KEYCHAIN:'1',CAVE_NO_BROWSER:'1',...env},stdio:['ignore','pipe','pipe']});
  let stdout='',stderr='';child.stdout.on('data',d=>stdout+=d);child.stderr.on('data',d=>stderr+=d);
  child.on('error',reject);child.on('close',code=>resolve({code,stdout,stderr}));
-});
+}));
 async function tree(dir,rel=''){
  const out=[];
  for(const entry of await readdir(join(dir,rel),{withFileTypes:true})){const path=rel?`${rel}/${entry.name}`:entry.name;if(entry.isDirectory())out.push(...await tree(dir,path));else out.push(path);}
  return out.sort();
 }
+
+describe('agent-build', {concurrency: TEST_CONCURRENCY}, () => {
 
 test('one agent file builds alone, as AGENT.md, named by its file',async t=>{
  const dir=await folder(t,{'.caveman/agents/support-bot.md':'You answer support questions.\n'},{name:'repo'});
@@ -87,9 +90,11 @@ test('a folder with a skill, a subagent and an eval builds every included file, 
 test('the same folder builds byte-identical agent.json and digest, whatever order its files were written in',async t=>{
  const one=await folder(t,triage);
  const two=await folder(t,triage,{order:Object.keys(triage).reverse()});
- const first=await run(['agent','build',one,'--format','json'],dirname(one));
- const again=await run(['agent','build',one,'--format','json','--out','out-a'],dirname(one));
- const other=await run(['agent','build',two,'--format','json','--out','out-b'],dirname(two));
+ const [first,again,other]=await Promise.all([
+  run(['agent','build',one,'--format','json'],dirname(one)),
+  run(['agent','build',one,'--format','json','--out','out-a'],dirname(one)),
+  run(['agent','build',two,'--format','json','--out','out-b'],dirname(two)),
+ ]);
  for(const r of [first,again,other])assert.equal(r.code,0,r.stdout);
  const [a,b,c]=[first,again,other].map(r=>JSON.parse(r.stdout));
  assert.equal(a.sha256,b.sha256);assert.equal(a.sha256,c.sha256);
@@ -122,23 +127,27 @@ test('--out writes exactly the build, and nothing is written without it',async t
 });
 
 test('with no path: the folder\'s AGENT.md, else the one agent under .caveman/agents/, and more than one is a usage error that lists them',async t=>{
- const here=await folder(t,{'AGENT.md':'Here.\n','.caveman/agents/other.md':'Other.\n'},{name:'here'});
- let result=await run(['agent','build'],here);
- assert.equal(result.code,0,result.stdout);assert.equal(JSON.parse(result.stdout).agent,'here');
- const repo=await folder(t,{'.caveman/agents/support.md':'Support.\n'},{name:'repo'});
- result=await run(['agent','build'],repo);
- assert.equal(result.code,0,result.stdout);assert.equal(JSON.parse(result.stdout).agent,'support');
- const nested=await folder(t,{'.caveman/agents/coder/AGENT.md':'Code.\n','.caveman/agents/coder/skills/git/SKILL.md':'Git.\n'},{name:'nested'});
- result=await run(['agent','build'],nested);
- assert.equal(result.code,0,result.stdout);assert.deepEqual(JSON.parse(result.stdout).manifest.skills,[{name:'git',path:'skills/git/SKILL.md'}]);
- const many=await folder(t,{'.caveman/agents/b.md':'B.\n','.caveman/agents/a/AGENT.md':'A.\n'},{name:'many'});
- result=await run(['agent','build'],many);
- assert.equal(result.code,2,result.stdout);
- const error=JSON.parse(result.stdout).error;
+ const [here,repo,nested,many,none]=await Promise.all([
+  folder(t,{'AGENT.md':'Here.\n','.caveman/agents/other.md':'Other.\n'},{name:'here'}),
+  folder(t,{'.caveman/agents/support.md':'Support.\n'},{name:'repo'}),
+  folder(t,{'.caveman/agents/coder/AGENT.md':'Code.\n','.caveman/agents/coder/skills/git/SKILL.md':'Git.\n'},{name:'nested'}),
+  folder(t,{'.caveman/agents/b.md':'B.\n','.caveman/agents/a/AGENT.md':'A.\n'},{name:'many'}),
+  folder(t,{'README.md':'x\n'},{name:'none'}),
+ ]);
+ const [rHere,rRepo,rNested,rMany,rNone]=await Promise.all([
+  run(['agent','build'],here),
+  run(['agent','build'],repo),
+  run(['agent','build'],nested),
+  run(['agent','build'],many),
+  run(['agent','build'],none),
+ ]);
+ assert.equal(rHere.code,0,rHere.stdout);assert.equal(JSON.parse(rHere.stdout).agent,'here');
+ assert.equal(rRepo.code,0,rRepo.stdout);assert.equal(JSON.parse(rRepo.stdout).agent,'support');
+ assert.equal(rNested.code,0,rNested.stdout);assert.deepEqual(JSON.parse(rNested.stdout).manifest.skills,[{name:'git',path:'skills/git/SKILL.md'}]);
+ assert.equal(rMany.code,2,rMany.stdout);
+ const error=JSON.parse(rMany.stdout).error;
  assert.equal(error.code,'cave_usage');assert.match(error.message,/More than one agent under \.caveman\/agents\/: a\/, b\.md\./);
- const none=await folder(t,{'README.md':'x\n'},{name:'none'});
- result=await run(['agent','build'],none);
- assert.equal(result.code,2);assert.match(JSON.parse(result.stdout).error.message,/No AGENT\.md/);
+ assert.equal(rNone.code,2);assert.match(JSON.parse(rNone.stdout).error.message,/No AGENT\.md/);
 });
 
 const refused=async(t,files,pattern,prepare)=>{
@@ -374,9 +383,13 @@ test('drives refuse what the build contract does not take, naming the key and th
 
 test('help answers without a sign-in or a request',async t=>{
  const dir=await folder(t,{'AGENT.md':'x\n'});
- const result=await run(['agent','build','--help'],dir);
+ const [result,family]=await Promise.all([
+  run(['agent','build','--help'],dir),
+  run(['agent','--help','--format','json'],dir),
+ ]);
  assert.equal(result.code,0);assert.match(JSON.parse(result.stdout).usage,/^cvm agent build /);
- const family=await run(['agent','--help','--format','json'],dir);
  assert.ok(JSON.parse(family.stdout).verbs.some(v=>v.verb==='build'));
  assert.ok(relative(dir,bin).length>0);
+});
+
 });

@@ -1,4 +1,4 @@
-import test from 'node:test';
+import test, {describe} from 'node:test';
 import assert from 'node:assert/strict';
 import {spawn} from 'node:child_process';
 import {mkdtemp,mkdir,readFile,readdir,rm,writeFile} from 'node:fs/promises';
@@ -6,6 +6,7 @@ import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {build,locate} from '../bin/agent-build.mjs';
+import {TEST_CONCURRENCY,limitSpawn} from './pool.mjs';
 
 const bin=fileURLToPath(new URL('../bin/cvm.mjs',import.meta.url));
 const template=fileURLToPath(new URL('../templates/ask/AGENT.md',import.meta.url));
@@ -18,11 +19,13 @@ async function scratch(t){
  t.after(()=>rm(dir,{recursive:true,force:true}));
  return dir;
 }
-const run=(args,cwd,env={})=>new Promise((resolve,reject)=>{
+const run=(args,cwd,env={})=>limitSpawn(()=>new Promise((resolve,reject)=>{
  const child=spawn(process.execPath,[bin,...args],{cwd,env:{HOME:cwd,USERPROFILE:cwd,CAVEMAN_HOME:join(cwd,'.caveman-home'),PATH:'/usr/bin:/bin',CAVE_NO_KEYCHAIN:'1',CAVE_NO_BROWSER:'1',...env},stdio:['ignore','pipe','pipe']});
  let stdout='',stderr='';child.stdout.on('data',d=>stdout+=d);child.stderr.on('data',d=>stderr+=d);
  child.on('error',reject);child.on('close',code=>resolve({code,stdout,stderr,json:()=>JSON.parse(stdout)}));
-});
+}));
+
+describe('agent-init', {concurrency: TEST_CONCURRENCY}, () => {
 
 test('Ask Caveman is a build with no computer, a concrete model and one connector: Caveman\'s own read tools',()=>{
  const b=build(locate(template));
@@ -64,17 +67,21 @@ test('cvm agent init ask DIR on another installation names its own console\'s /m
 
 test('cvm agent init refuses an unknown template, a folder that holds AGENT.md, and a file; help needs no sign-in',async t=>{
  const cwd=await scratch(t);
- let result=await run(['agent','init','nope','--format','json'],cwd);
- assert.equal(result.code,2);assert.match(result.json().error.message,/no template "nope"\. Templates: ask/);
  await mkdir(join(cwd,'taken'));await writeFile(join(cwd,'taken','AGENT.md'),'mine\n');
- result=await run(['agent','init','ask','taken','--format','json'],cwd);
- assert.equal(result.code,2);assert.match(result.json().error.message,/taken already holds AGENT\.md; cvm writes over nothing/);
- assert.equal(await readFile(join(cwd,'taken','AGENT.md'),'utf8'),'mine\n');
  await writeFile(join(cwd,'plain'),'x');
- result=await run(['agent','init','ask','plain','--format','json'],cwd);
- assert.equal(result.code,2);assert.match(result.json().error.message,/plain is a file/);
- result=await run(['agent','init','--help','--format','json'],cwd);
- assert.equal(result.code,0);assert.match(result.json().usage,/^cvm agent init TEMPLATE/);
- const family=await run(['agent','--help','--format','json'],cwd);
+ const [nope,taken,plain,help,family]=await Promise.all([
+  run(['agent','init','nope','--format','json'],cwd),
+  run(['agent','init','ask','taken','--format','json'],cwd),
+  run(['agent','init','ask','plain','--format','json'],cwd),
+  run(['agent','init','--help','--format','json'],cwd),
+  run(['agent','--help','--format','json'],cwd),
+ ]);
+ assert.equal(nope.code,2);assert.match(nope.json().error.message,/no template "nope"\. Templates: ask/);
+ assert.equal(taken.code,2);assert.match(taken.json().error.message,/taken already holds AGENT\.md; cvm writes over nothing/);
+ assert.equal(await readFile(join(cwd,'taken','AGENT.md'),'utf8'),'mine\n');
+ assert.equal(plain.code,2);assert.match(plain.json().error.message,/plain is a file/);
+ assert.equal(help.code,0);assert.match(help.json().usage,/^cvm agent init TEMPLATE/);
  assert.ok(family.json().verbs.some(v=>v.verb==='init'));
+});
+
 });

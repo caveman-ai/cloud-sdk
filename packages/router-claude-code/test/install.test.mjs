@@ -3,7 +3,7 @@ import { execFile } from "node:child_process";
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import test from "node:test";
+import test, { describe } from "node:test";
 import { promisify } from "node:util";
 import { fileURLToPath } from "node:url";
 
@@ -15,6 +15,8 @@ function cli(home, args) {
     env: { PATH: process.env.PATH, HOME: home, CAVEMAN_ROUTER_HOME: join(home, "state") },
   });
 }
+
+describe("install", { concurrency: true }, () => {
 
 test("install is idempotent and uninstall removes only our entries", async () => {
   const home = mkdtempSync(join(tmpdir(), "router-install-"));
@@ -66,4 +68,6 @@ test("login keeps the key file at 0600 even when it already exists wider", async
   assert.equal(statSync(config).mode & 0o777, 0o600);
   // …and `status` never prints the key it just wrote.
   assert.ok(!(await cli(home, ["status"])).stdout.includes("crk_two"));
+});
+
 });

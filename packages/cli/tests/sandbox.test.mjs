@@ -1,6 +1,6 @@
 // `cvm sandbox` against the recorded wire (public/sdk/parity/sandboxes-wire.json, served by the
 // SDK's fake Cloud): the installed command, run as a user runs it, in an isolated HOME.
-import test from 'node:test';
+import test, {describe} from 'node:test';
 import assert from 'node:assert/strict';
 import {spawn} from 'node:child_process';
 import {chmod,mkdir,mkdtemp,readFile,readdir,rm,stat,writeFile} from 'node:fs/promises';
@@ -10,6 +10,7 @@ import {join} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {startFake,wire} from '../../sdk-ts/tests/sandbox-fake.mjs';
 import {verbs} from '../bin/sandbox.mjs';
+import {TEST_CONCURRENCY,limitSpawn,mapPool} from './pool.mjs';
 
 const bin=fileURLToPath(new URL('../bin/cvm.mjs',import.meta.url));
 const key='cave_live_wire';
@@ -19,7 +20,7 @@ async function cvm(t,options={}){
  const fake=await startFake(options);
  const home=await mkdtemp(join(tmpdir(),'cvm-sandbox-'));
  t.after(async()=>{await fake.close();await rm(home,{recursive:true,force:true});});
- const run=(args,{stdin,env={}}={})=>new Promise((resolve,reject)=>{
+ const run=(args,{stdin,env={}}={})=>limitSpawn(()=>new Promise((resolve,reject)=>{
   const child=spawn(process.execPath,[bin,...args],{cwd:home,env:{HOME:home,USERPROFILE:home,CAVEMAN_HOME:join(home,'.caveman'),PATH:process.env.PATH,CAVE_NO_KEYCHAIN:'1',CAVE_NO_BROWSER:'1',
    CAVE_API_URL:fake.url,CAVE_TOKEN:key,...env},stdio:[stdin===undefined?'ignore':'pipe','pipe','pipe']});
   let stdout='',stderr='';child.stdout.on('data',d=>stdout+=d);child.stderr.on('data',d=>stderr+=d);
@@ -28,9 +29,11 @@ async function cvm(t,options={}){
    assert.ok(!(stdout+stderr).includes(key),'must not print the key');
    resolve({code,stdout,stderr,json:()=>JSON.parse(stdout)});
   });
- });
+ }));
  return {fake,run,home};
 }
+
+describe('sandbox', {concurrency: TEST_CONCURRENCY}, () => {
 
 test('create waits until the sandbox runs; list, get, sleep, resume and delete read as a person reads them', async t => {
  const {fake,run}=await cvm(t);
@@ -120,11 +123,11 @@ test('exec sets the command\'s environment and folder, and Ctrl-C sends it INT',
  assert.deepEqual([r.code,r.stdout,r.stderr],[0,said('start_with_cwd'),'']);
  r=await run(['sandbox','exec','-e','GREETING=hello env',id,'--','sh','-c','echo "$GREETING"']);
  assert.deepEqual([r.code,r.stdout,r.stderr],[0,'hello env\n','']);
- for(const [args,message] of [[['-e','NOEQUALS'],/-e is KEY=VALUE/],[['-e','=x'],/-e is KEY=VALUE/],[['-w','relative'],/-w is an absolute folder/]]){
-  r=await run(['sandbox','exec',...args,id,'--','true']);
+ await Promise.all([[['-e','NOEQUALS'],/-e is KEY=VALUE/],[['-e','=x'],/-e is KEY=VALUE/],[['-w','relative'],/-w is an absolute folder/]].map(async([args,message])=>{
+  const r=await run(['sandbox','exec',...args,id,'--','true']);
   assert.equal(r.code,2);
   assert.match(r.stderr,message);
- }
+ }));
  // Ctrl-C: the command is sent INT (the recording's: it ends on it, 130), and cvm exits with its code.
  // Windows has no interrupt one process can send another: child.kill('SIGINT') ends cvm outright
  // there (TerminateProcess, exit code null), so cvm never hears it and only POSIX can check this.
@@ -176,11 +179,11 @@ test('create asks a lifetime and a network, and get says them with the pause', a
  r=await run(['sandbox','get',id,'--format','table']);
  assert.match(r.stdout,/deleted at +2026-11-20T08:00:00Z\n/);
  // Refused before anything is sent: a lifetime out of its bounds, a network cvm does not know.
- for(const [args,said] of [[['--lifetime','30s'],/--lifetime is a time from 1m to 30d/],[['--lifetime','31d'],/--lifetime is a time from 1m to 30d/],[['--network','vpn'],/--network is none/]]){
-  r=await run(['sandbox','create',...args,'--format','table']);
-  assert.equal(r.code,2);
-  assert.match(r.stdout,said);
- }
+ await Promise.all([[['--lifetime','30s'],/--lifetime is a time from 1m to 30d/],[['--lifetime','31d'],/--lifetime is a time from 1m to 30d/],[['--network','vpn'],/--network is none/]].map(async([args,said])=>{
+  const res=await run(['sandbox','create',...args,'--format','table']);
+  assert.equal(res.code,2);
+  assert.match(res.stdout,said);
+ }));
  assert.equal(bodies.length,1);
 });
 
@@ -305,19 +308,20 @@ test('cp copies a file into a sandbox and out of it, whole or not at all; ls lis
  assert.match(r.stdout,/cave_code_computer_file_not_found/);
  // Refused before anything is sent: both sides here, a relative path there, a folder here, a file not here.
  const before=fake.state.fileOps.length;
- for(const [args,said] of [
-  [[local,join(home,'x')],/One side is the sandbox's/],
-  [[local,`${id}:run.sh`],/A path in a sandbox is absolute/],
-  [[join(home,'out'),`${id}:/out`],/is a folder: cp copies one file/],
-  [[join(home,'missing'),`${id}:/m`],/^failed   cave_local_file_not_found: There is no .*missing here\.\n$/],
-  [['-',`${id}:/`],/Name the file to write in the sandbox/],
- ]){
-  r=await run(['sandbox','cp',...args,'--format','table']);
-  assert.ok(r.code>0,args.join(' '));
-  assert.match(r.stdout,said);
- }
- r=await run(['sandbox','ls',id,'relative','--format','table']);
- assert.equal(r.code,2);
+ await Promise.all([
+  ...([
+   [[local,join(home,'x')],/One side is the sandbox's/],
+   [[local,`${id}:run.sh`],/A path in a sandbox is absolute/],
+   [[join(home,'out'),`${id}:/out`],/is a folder: cp copies one file/],
+   [[join(home,'missing'),`${id}:/m`],/^failed   cave_local_file_not_found: There is no .*missing here\.\n$/],
+   [['-',`${id}:/`],/Name the file to write in the sandbox/],
+  ].map(async([args,said])=>{
+   const res=await run(['sandbox','cp',...args,'--format','table']);
+   assert.ok(res.code>0,args.join(' '));
+   assert.match(res.stdout,said);
+  })),
+  (async()=>{const res=await run(['sandbox','ls',id,'relative','--format','table']);assert.equal(res.code,2);})(),
+ ]);
  assert.equal(fake.state.fileOps.length,before);
  assert.deepEqual(fake.state.errors,[]);
 });
@@ -364,11 +368,11 @@ test('port-forward carries each connection here to the sandbox\'s port, says a r
 test('port-forward refuses a port that is not one, and a sandbox it cannot read, before it listens', async t => {
  // The key's 403 while the computers API is off.
  const {fake,run}=await cvm(t,{rest:(req,res)=>res.writeHead(wire.rest.off_list.status,{'content-type':'application/json'}).end(JSON.stringify(wire.rest.off_list.answer))});
- for(const port of ['0','65536','80:','a:80','1:2:3']){
+ await mapPool(['0','65536','80:','a:80','1:2:3'],async port=>{
   const r=await run(['sandbox','port-forward',id,port,'--format','table']);
   assert.equal(r.code,2,port);
   assert.match(r.stdout,/The port is a number from 1 to 65535/);
- }
+ });
  assert.deepEqual(fake.state.seen,[]);
  const r=await run(['sandbox','port-forward',id,'8080','--format','table']);
  assert.equal(r.code,4);
@@ -468,13 +472,13 @@ test('the snapshot verbs: json, a fork that waits until it runs, a take that fai
  r=await run(['sandbox','snapshots',box,'--format','table']);
  assert.equal(r.stdout,`No snapshots of ${box} yet. Take one with: cvm sandbox snapshot ${box}\n`);
  const sent=fake.state.seen.length;
- for(const [args,said] of [[['restore',box],/Use cvm sandbox restore SANDBOX SNAPSHOT/],[['restore',box,'not-an-id'],/A snapshot is named by its id/],[['fork','nope',snap.id],/A sandbox is named by its id/],
+ await mapPool([[['restore',box],/Use cvm sandbox restore SANDBOX SNAPSHOT/],[['restore',box,'not-an-id'],/A snapshot is named by its id/],[['fork','nope',snap.id],/A sandbox is named by its id/],
   [['fork',box,snap.id,'--size','huge'],/--size is <cores>cpu-<gigabytes>gb/],[['snapshot',box,'--name','a\x01b'],/--name is at most 200 characters/],[['snapshots',box,snap.id],/Use cvm sandbox snapshots SANDBOX/],
-  [['snapshot',box,'--yes'],/Unknown option '--yes'/]]){
-  r=await run(['sandbox',...args,'--format','table']);
-  assert.equal(r.code,2,args.join(' '));
-  assert.match(r.stdout,said);
- }
+  [['snapshot',box,'--yes'],/Unknown option '--yes'/]],async([args,said])=>{
+  const res=await run(['sandbox',...args,'--format','table']);
+  assert.equal(res.code,2,args.join(' '));
+  assert.match(res.stdout,said);
+ });
  assert.equal(fake.state.seen.length,sent);
 });
 
@@ -484,10 +488,10 @@ test('the snapshot verbs with the switch off say so in the one line', async t =>
   if(req.url.includes('/snapshots'))return res.writeHead(404,{'content-type':'application/json'}).end(JSON.stringify({error:{type:'cave_gateway_error',code:'cave_not_found',message:'Not found.',request_id:'r'}}));
   res.writeHead(wire.rest.off_list.status,{'content-type':'application/json'}).end(JSON.stringify(wire.rest.off_list.answer));
  }});
- for(const args of [['snapshot',box],['snapshots',box],['restore',box,snap.id],['fork',box,snap.id],['snapshot-delete',box,snap.id,'--yes']]){
+ await mapPool([['snapshot',box],['snapshots',box],['restore',box,snap.id],['fork',box,snap.id],['snapshot-delete',box,snap.id,'--yes']],async args=>{
   const r=await run(['sandbox',...args,'--format','table']);
   assert.deepEqual([r.code,r.stdout],[4,'failed   cave_sandboxes_off: Sandboxes are switched off on this Caveman Cloud (computers.api.enabled): ask its admin to turn them on.\n'],args.join(' '));
- }
+ });
  // On, a snapshot that is not there stays the API's own refusal.
  const on=await cvm(t,{rest:(req,res)=>{
   if(req.url.includes('/snapshots'))return res.writeHead(404,{'content-type':'application/json'}).end(JSON.stringify({error:{type:'cave_gateway_error',code:'cave_not_found',message:'Snapshot not found.',request_id:'r'}}));
@@ -531,11 +535,11 @@ test('url prints a port\'s link, says on stderr how long it opens and how a prog
  assert.deepEqual(fake.state.seen.map(s=>[s.method,s.path,s.body]).slice(1),[['PUT',`/api/v1/code/computers/${id}/ports/3000`,'{"visibility":"public"}'],['POST',`/api/v1/code/computers/${id}/ports/3000/token`,'{}']]);
  // What cvm refuses before anything is sent.
  fake.state.seen.length=0;
- for(const args of [[id,'0'],[id,'65536'],[id,'http'],[id,'3000','--ttl','30s'],[id,'3000','--ttl','25h'],[id,'3000','--public','--private'],[id]]){
-  r=await run(['sandbox','url',...args,'--format','table']);
-  assert.equal(r.code,2,args.join(' ')+': '+r.stdout);
-  assert.match(r.stdout,/^failed   cave_usage: /);
- }
+ await mapPool([[id,'0'],[id,'65536'],[id,'http'],[id,'3000','--ttl','30s'],[id,'3000','--ttl','25h'],[id,'3000','--public','--private'],[id]],async args=>{
+  const res=await run(['sandbox','url',...args,'--format','table']);
+  assert.equal(res.code,2,args.join(' ')+': '+res.stdout);
+  assert.match(res.stdout,/^failed   cave_usage: /);
+ });
  assert.deepEqual(fake.state.seen,[]);
  // A Caveman Cloud that does not serve ports at their own URLs: its routes answer as unknown ones do, said as one line.
  served=false;
@@ -580,4 +584,6 @@ test('the quickstart\'s snippets are the end-to-end tests\' own', async () => {
  const lines=[...(await part('packages/cli/tests/sandbox.e2e.mjs','cli')).matchAll(/^ *(['"])(cvm .*)\1,$/gm)].map(m=>m[2]);
  assert.equal(lines.length,3);
  assert.equal(snippet('cli'),lines.join('\n'));
+});
+
 });

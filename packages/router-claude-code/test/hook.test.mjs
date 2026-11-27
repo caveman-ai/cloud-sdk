@@ -4,7 +4,7 @@ import { createServer } from "node:http";
 import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import test from "node:test";
+import test, { describe } from "node:test";
 import { fileURLToPath } from "node:url";
 
 const CLI = fileURLToPath(new URL("../dist/cli.js", import.meta.url));
@@ -89,6 +89,8 @@ function answer(payload) {
     res.end(JSON.stringify(payload));
   };
 }
+
+describe("hook", { concurrency: true }, () => {
 
 test("a delegate answer rewrites the model and shows the human one line", async () => {
   const box = sandbox();
@@ -233,4 +235,6 @@ test("a transcript outside ~/.claude/projects is never opened", async () => {
   } finally {
     router.close();
   }
+});
+
 });

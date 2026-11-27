@@ -1,4 +1,4 @@
-import test from 'node:test';
+import test, {describe} from 'node:test';
 import assert from 'node:assert/strict';
 import {spawn} from 'node:child_process';
 import {createServer} from 'node:http';
@@ -8,6 +8,7 @@ import {join} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {connect,POLL,WAIT} from '../bin/connect.mjs';
 import * as F from './fixtures/connectors.mjs';
+import {TEST_CONCURRENCY,limitSpawn,mapPool} from './pool.mjs';
 
 const bin=fileURLToPath(new URL('../bin/cvm.mjs',import.meta.url));
 const secret='synthetic-connect-secret-never-print';
@@ -51,11 +52,11 @@ async function api(t,routes={}){
   await mkdir(join(home,'.caveman'));
   await writeFile(join(home,'.caveman','cloud.json'),JSON.stringify({baseURL:url,tokenStore:'file'}));
   await writeFile(join(home,'.caveman','credentials'),JSON.stringify({access_token:secret}),{mode:0o600});
-  return new Promise((resolve,reject)=>{
+  return limitSpawn(()=>new Promise((resolve,reject)=>{
    const child=spawn(process.execPath,[bin,...args],{cwd:home,env:{HOME:home,USERPROFILE:home,CAVEMAN_HOME:join(home,'.caveman'),PATH:process.env.PATH,CAVE_NO_KEYCHAIN:'1',CAVE_NO_BROWSER:'1',...env},stdio:['ignore','pipe','pipe']});
    let stdout='',stderr='';child.stdout.on('data',d=>stdout+=d);child.stderr.on('data',d=>stderr+=d);
    child.on('error',reject);child.on('close',code=>{assert.ok(!(stdout+stderr).includes(secret),'must not print the credential');resolve({code,stdout,stderr,json:()=>JSON.parse(stdout)});});
-  });
+  }));
  };
  const sent=()=>seen.map(r=>[r.method,r.path,r.body]);
  return {seen,sent,url,run,spawned};
@@ -76,6 +77,8 @@ const addRoutes=(extra={})=>({
  [`POST ${C}/linear/writes`]:()=>[200,{connector:F.connector({connection:F.connection({updated_at:'2026-11-19T10:02:00Z'})})}],
  ...extra,
 });
+
+describe('connect', {concurrency: TEST_CONCURRENCY}, () => {
 
 test('add from the catalog: the template, the sign-in opened and waited for (pending twice, then connected), the tools read, listed and accepted, then writes',async t=>{
  const f=await api(t,addRoutes());
@@ -628,42 +631,49 @@ test('what the API sends never reaches the terminal raw: escapes, bidi overrides
 test('help: the family, each verb, and the rows cvm.mjs lists, with no sign-in and no request; cvm --help lists the connect rows',async t=>{
  const f=await api(t);
  const verbs=['add','ls','test','diff','accept','rotate','pause','resume','allow-writes','grant','request','requests','rm'];
- const top=await f.spawned(['connect','--help']);
+ const [top,dispatcher,verbHelps,bare,screen,unknown,cvmTop,cvmScreen]=await Promise.all([
+  f.spawned(['connect','--help']),
+  readFile(bin,'utf8'),
+  mapPool(verbs,verb=>f.spawned(['connect',verb,'--help'])),
+  f.spawned(['connect']),
+  f.spawned(['connect','--help','--format','table']),
+  f.spawned(['connect','lst']),
+  f.spawned(['--help','--format','json']),
+  f.spawned(['--help','--format','table']),
+ ]);
  assert.equal(top.code,0,top.stdout);
  assert.deepEqual(top.json().commands.map(c=>c.verb),verbs);
- const dispatcher=await readFile(bin,'utf8');
  for(const command of top.json().commands){
   assert.match(command.usage,new RegExp(`^cvm connect ${command.verb} `.replace(/ $/,'( |$)')));
   assert.ok(dispatcher.includes(`{id:'connect.${command.verb}',usage:'${command.usage.replace(/'/g,"\\'")}',`),`cvm.mjs lists cvm connect ${command.verb} as its help does`);
  }
- for(const verb of verbs){
-  const r=await f.spawned(['connect',verb,'--help']);
+ verbs.forEach((verb,i)=>{
+  const r=verbHelps[i];
   assert.equal(r.code,0,r.stdout);assert.match(r.json().usage,new RegExp(`^cvm connect ${verb}( |$)`));
- }
- const bare=await f.spawned(['connect']);
+ });
  assert.equal(bare.code,0);assert.equal(bare.json().usage,'cvm connect VERB [NAME] [flags] [--format json|table]');
- const screen=await f.spawned(['connect','--help','--format','table']);
  assert.match(screen.stdout,/^Connectors: the servers your organization's agents use, signed in once for the team\.\n\n {2}cvm connect add TEMPLATE\|URL /);
- const unknown=await f.spawned(['connect','lst']);
  assert.equal(unknown.code,2);assert.match(unknown.json().error.message,/^Unknown connect command lst\./);
- const cvmTop=await f.spawned(['--help','--format','json']);
  assert.ok(cvmTop.json().families.includes('connect'));
  assert.equal(cvmTop.json().connect,'cvm connect add NAME | cvm connect ls | cvm connect diff|accept NAME | cvm connect grant NAME');
- const cvmScreen=await f.spawned(['--help','--format','table']);
  assert.match(cvmScreen.stdout,/\nConnect\n {2}cvm connect add NAME +add a connector and sign it in for the team\n {2}cvm connect ls +state, sign-in, tools and who uses each\n {2}cvm connect diff\|accept NAME +what changed upstream; accept its tools\n {2}cvm connect grant NAME +let a deployment use one, or answer a request\n\nDeploy\n/);
  assert.deepEqual(f.seen,[]);
 });
 
 test('cvm connect as a person types it: cvm.mjs dispatches, signs in as every verb does, and prints JSON with no terminal',async t=>{
  const f=await api(t,{[`GET ${C}`]:()=>[200,{connectors:[F.connector()]}],[`POST ${C}/linear/test`]:()=>[200,F.testOk]});
- const ls=await f.spawned(['connect','ls']);
+ const [ls,table,rm,signedOut]=await Promise.all([
+  f.spawned(['connect','ls']),
+  f.spawned(['connect','test','linear','--format','table']),
+  f.spawned(['connect','rm','linear']),
+  f.spawned(['connect','ls'],{CAVE_API_URL:'http://127.0.0.1:9'}),
+ ]);
  assert.equal(ls.code,0,ls.stdout+ls.stderr);assert.equal(ls.json().connectors[0].name,'linear');
- assert.equal(f.seen[0].headers.authorization,`Bearer ${secret}`);
- const table=await f.spawned(['connect','test','linear','--format','table']);
+ assert.equal(f.seen.find(r=>r.path===C).headers.authorization,`Bearer ${secret}`);
  assert.equal(table.stdout,'ok       linear  23 tools in 412 ms\n');
  // No terminal: an add waits with no browser and no question, and rm needs --yes.
- const rm=await f.spawned(['connect','rm','linear']);
  assert.equal(rm.code,2);assert.equal(rm.json().fix,'cvm connect rm linear --yes');
- const signedOut=await f.spawned(['connect','ls'],{CAVE_API_URL:'http://127.0.0.1:9'});
  assert.equal(signedOut.code,3);assert.equal(signedOut.json().error.code,'cave_auth_required');
+});
+
 });

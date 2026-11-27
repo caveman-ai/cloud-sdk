@@ -1,4 +1,4 @@
-import {test} from 'node:test';
+import {describe, test} from 'node:test';
 import assert from 'node:assert/strict';
 import {createServer} from 'node:http';
 import {CloudError, SandboxCommand, Sandboxes, SandboxError, SandboxExecError, SandboxFileError, SandboxStateError, SnapshotStateError, sandboxErrorCodes, sandboxRoutes, sandboxStream} from '../dist/sandboxes.js';
@@ -6,6 +6,8 @@ import {startFake, wire} from './sandbox-fake.mjs';
 
 const client = (url, options = {}) => new Sandboxes({controlURL: url, apiKey: 'cave_live_wire', retryDelayMs: 0, ...options});
 const id = wire.rest.create.answer.id;
+
+describe('sandboxes', {concurrency: true}, () => {
 
 test('the plain calls send the key, the route and the body, and read the recorded answers', async t => {
   const fake = await startFake();
@@ -579,4 +581,6 @@ test('url answers a port at its own URL: its link, its token and the header a pr
   // The plain calls are there too: the choices stored and a port made private again.
   assert.equal((await sandboxes.setPort(id, 3000, {visibility: 'private'})).visibility, 'private');
   assert.deepEqual(fake.state.errors, []);
+});
+
 });

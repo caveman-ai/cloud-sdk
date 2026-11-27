@@ -372,7 +372,7 @@ class _Gateway:
                 pass
 
         self.server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
-        threading.Thread(target=self.server.serve_forever, daemon=True).start()
+        threading.Thread(target=self.server.serve_forever, kwargs={"poll_interval": 0.01}, daemon=True).start()
         self.cave = Cave(api_key="cave_live_test", base_url=f"http://127.0.0.1:{self.server.server_port}", agent="tool-event-agent")
 
     def close(self) -> None:
