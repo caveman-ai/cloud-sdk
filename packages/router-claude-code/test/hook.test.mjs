@@ -4,7 +4,7 @@ import { createServer } from "node:http";
 import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import test from "node:test";
+import test, { describe } from "node:test";
 import { fileURLToPath } from "node:url";
 
 const CLI = fileURLToPath(new URL("../dist/cli.js", import.meta.url));
@@ -59,7 +59,7 @@ async function fakeRouter(handler) {
     });
   });
   await new Promise((r) => server.listen(0, "127.0.0.1", r));
-  return { seen, url: `http://127.0.0.1:${server.address().port}`, close: () => server.close() };
+  return { seen, url: `http://127.0.0.1:${server.address().port}`, close: () => { server.closeAllConnections(); server.close(); } };
 }
 
 function runHook(box, payload, env = {}) {
@@ -89,6 +89,8 @@ function answer(payload) {
     res.end(JSON.stringify(payload));
   };
 }
+
+describe("hook", { concurrency: true }, () => {
 
 test("a delegate answer rewrites the model and shows the human one line", async () => {
   const box = sandbox();
@@ -233,4 +235,6 @@ test("a transcript outside ~/.claude/projects is never opened", async () => {
   } finally {
     router.close();
   }
+});
+
 });

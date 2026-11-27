@@ -44,7 +44,7 @@
   "scripts": {
     "build": "node scripts/build.mjs",
     "prepack": "node scripts/build.mjs",
-    "test": "node scripts/build.mjs && node --test tests/*.test.mjs"
+    "test": "node scripts/build.mjs --if-stale && node --test tests/*.test.mjs"
   },
   "repository": {
     "type": "git",

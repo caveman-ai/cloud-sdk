@@ -4,7 +4,7 @@ import { createServer } from "node:http";
 import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import test from "node:test";
+import test, { describe } from "node:test";
 import { fileURLToPath } from "node:url";
 
 const CLI = fileURLToPath(new URL("../dist/cli.js", import.meta.url));
@@ -39,8 +39,10 @@ const settingsOf = (home) => JSON.parse(readFileSync(join(home, ".claude", "sett
 async function fakeRouter(handler) {
   const server = createServer(handler);
   await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
-  return { url: `http://127.0.0.1:${server.address().port}`, close: () => server.close() };
+  return { url: `http://127.0.0.1:${server.address().port}`, close: () => { server.closeAllConnections(); server.close(); } };
 }
+
+describe("claude-code", { concurrency: true }, () => {
 
 test("setup defaults to subscription mode: base url + our custom header, no auth token", async () => {
   const home = box();
@@ -170,11 +172,11 @@ test("model validates, sets and reads back", async () => {
     assert.match(out.stdout, /\/model inside Claude Code still works/);
     assert.equal(settingsOf(home).model, good);
   }
-  for (const bad of ["opus 5", "justaname", "auto:", "with space/x"]) {
+  await Promise.all(["opus 5", "justaname", "auto:", "with space/x"].map(async (bad) => {
     const out = await cli(home, ["model", bad]);
     assert.equal(out.code, 1, bad);
     assert.match(out.stderr, /not a model name/);
-  }
+  }));
   assert.match((await cli(home, ["model"])).stdout, /google\/gemini-3\.7-flash/);
 });
 
@@ -251,4 +253,6 @@ test("teardown keeps a user's own Anthropic token", async () => {
   await cli(home, ["teardown", "claude-code"]);
   assert.equal(settingsOf(home).env.ANTHROPIC_AUTH_TOKEN, "sk-ant-mine");
   assert.equal(settingsOf(home).env.ANTHROPIC_BASE_URL, undefined);
+});
+
 });

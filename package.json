@@ -7,7 +7,7 @@
   "packageManager": "pnpm@10.14.0",
   "scripts": {
     "build": "pnpm -r build",
-    "test": "pnpm -r test"
+    "test": "pnpm -r --workspace-concurrency=8 test"
   },
   "devDependencies": {
     "esbuild": "0.28.2",

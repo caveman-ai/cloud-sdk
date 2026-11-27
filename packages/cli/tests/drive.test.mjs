@@ -1,4 +1,4 @@
-import test from 'node:test';
+import test, {describe} from 'node:test';
 import assert from 'node:assert/strict';
 import {spawn} from 'node:child_process';
 import {createServer} from 'node:http';
@@ -7,6 +7,7 @@ import {existsSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join,dirname} from 'node:path';
 import {fileURLToPath} from 'node:url';
+import {TEST_CONCURRENCY,limitSpawn,mapPool} from './pool.mjs';
 
 const bin=fileURLToPath(new URL('../bin/cvm.mjs',import.meta.url));
 // `cvm drive` as it runs when stdout is a terminal: the one fact it reads to
@@ -59,7 +60,7 @@ async function fixture(t,routes={},{signedIn=true,early}={}){
   await writeFile(join(home,'.caveman','credentials'),JSON.stringify({access_token:secret}),{mode:0o600});
  }
  // showsToken: the one command that may print a share token (share).
- const start=(argv,label,env={},{input,showsToken=false}={})=>new Promise((resolve,reject)=>{
+ const start=(argv,label,env={},{input,showsToken=false}={})=>limitSpawn(()=>new Promise((resolve,reject)=>{
   const child=spawn(process.execPath,argv,{cwd:home,env:{HOME:home,USERPROFILE:home,CAVEMAN_HOME:join(home,'.caveman'),PATH:'/usr/bin:/bin',CAVE_NO_KEYCHAIN:'1',CAVE_NO_BROWSER:'1',...env},stdio:[input===undefined?'ignore':'pipe','pipe','pipe']});
   const out=[];let stderr='';child.stdout.on('data',d=>out.push(d));child.stderr.on('data',d=>stderr+=d);
   if(input!==undefined)child.stdin.end(input);
@@ -69,7 +70,7 @@ async function fixture(t,routes={},{signedIn=true,early}={}){
    if(!showsToken)assert.ok(!(stdout+stderr).includes(token)&&!/cdrv_[A-Za-z0-9_-]{16,}/.test(stdout+stderr),`must not print a share token: ${label}`);
    resolve({code,stdout,stderr,bytes,json:()=>JSON.parse(stdout)});
   });
- });
+ }));
  const run=(args,env,options)=>start([bin,...args],args.join(' '),env,options);
  // onTerminal runs `cvm drive ARGS` signed in as run is, with stdout a terminal.
  const onTerminal=(args,env,options)=>start(['--input-type=module','-e',asTerminal,new URL('../bin/drive.mjs',import.meta.url).href,...args],args.join(' '),{CVM_TEST_URL:url,CVM_TEST_TOKEN:secret,...env},options);
@@ -82,6 +83,8 @@ const drive=(over={})=>({id:driveId,organization_id:'org',project_id:null,name:'
 const grant=(over={})=>({id:grantId,drive_id:driveId,folder_id:'n1',path:'/docs',read:true,write:false,principal_type:'token',service_account_id:null,label:'',expires_at:'2026-11-18T11:00:00Z',revoked_at:null,last_used_at:null,issued_by_user_id:'u1',created_at:'2026-11-18T10:00:00Z',live:true,...over});
 const written=(req,over={})=>[200,{file:file(req.query.path,{size_bytes:req.raw.length,version:9,...over}),unchanged:false}];
 const calls=f=>f.seen.map(r=>`${r.method} ${r.path}`);
+
+describe('drive', {concurrency: TEST_CONCURRENCY}, () => {
 
 test('cvm drive usage, set and unarchive call their routes and say what they did',async t=>{
  let usage={stored_bytes:3_200_000_000,ceiling_bytes:1000_000_000_000,billing:true,included_bytes:10_000_000_000,month:{start:'2026-11-01',gb_months:'0.410',billed_usd:0,unpaid_usd:0}};
@@ -106,19 +109,19 @@ test('cvm drive usage, set and unarchive call their routes and say what they did
  await f.run(['drive','set','notes','--keep','7','--description','Kept a week']);
  assert.deepEqual(f.last().body,{retention_days:7,description:'Kept a week'});
  const before=f.seen.length;
- for(const bad of [['set','notes'],['set','notes','--keep','0d'],['set','notes','--keep','3651d'],['set','notes','--keep','2w'],['set','notes/docs','--keep','9d'],['usage','notes'],['unarchive']]){
+ await mapPool([['set','notes'],['set','notes','--keep','0d'],['set','notes','--keep','3651d'],['set','notes','--keep','2w'],['set','notes/docs','--keep','9d'],['usage','notes'],['unarchive']],async bad=>{
   const refused=await f.run(['drive',...bad]);assert.equal(refused.code,2,`${bad.join(' ')}: ${refused.stdout}`);assert.equal(refused.json().error.code,'cave_usage');
- }
+ });
  assert.equal(f.seen.length,before,'nothing is sent for a refused command');
 
  result=await f.run(['drive','unarchive',driveId,'--format','table']);
  assert.equal(result.code,0,result.stdout);
  assert.deepEqual([f.last().method,f.last().path,f.last().body],['POST',`${drives}/${driveId}/unarchive`,{}]);
  assert.equal(result.stdout,`unarchived  notes  ${driveId}\n`);
- for(const verb of [['usage'],['set','x','--keep','9d'],['unarchive',driveId]]){
+ await mapPool([['usage'],['set','x','--keep','9d'],['unarchive',driveId]],async verb=>{
   const refused=await f.run(['drive',...verb],{CAVEMAN_DRIVE_TOKEN:token});
   assert.equal(refused.code,2);assert.equal(refused.json().error.code,'cave_share_token_scope');
- }
+ });
 });
 
 test('cvm drive lists drives; create, archive and verify each call their route',async t=>{
@@ -146,9 +149,9 @@ test('cvm drive lists drives; create, archive and verify each call their route',
  const before=f.seen.length;
  result=await f.run(['drive','archive','notes']);
  assert.equal(result.code,2);assert.equal(result.json().error.code,'cave_confirmation_required');
- for(const bad of [['create','Bad_Name'],['create'],['archive','notes/docs','--yes'],['verify'],['list','extra'],['create','x','--yes'],['ls','notes','--format','xml']]){
+ await mapPool([['create','Bad_Name'],['create'],['archive','notes/docs','--yes'],['verify'],['list','extra'],['create','x','--yes'],['ls','notes','--format','xml']],async bad=>{
   const refused=await f.run(['drive',...bad]);assert.equal(refused.code,2,`${bad.join(' ')}: ${refused.stdout}`);assert.equal(refused.json().error.code,'cave_usage');
- }
+ });
  assert.equal(f.seen.length,before,'nothing is sent for a refused command');
  result=await f.run(['drive','archive','notes','--yes','--format','table']);
  assert.deepEqual([f.last().method,f.last().path,f.last().body],['POST',`${notes}/archive`,{}]);
@@ -181,7 +184,7 @@ test('ls follows next_cursor to the end and prints name, size, tokens, writer, v
  pages.Yw.next_cursor='Yw';
  result=await f.run(['drive','ls','notes/docs']);
  assert.equal(result.code,6);assert.equal(result.json().error.code,'cave_invalid_response');
- for(const bad of [['ls'],['ls','Bad Drive/x'],['ls','../x'],['ls','notes','--yes']]){const refused=await f.run(['drive',...bad]);assert.equal(refused.code,2,bad.join(' '));}
+ await mapPool([['ls'],['ls','Bad Drive/x'],['ls','../x'],['ls','notes','--yes']],async bad=>{const refused=await f.run(['drive',...bad]);assert.equal(refused.code,2,bad.join(' '));});
 });
 
 test('ls of an empty folder says so; a file\'s own listing is its name',async t=>{
@@ -213,9 +216,9 @@ test('cat follows the read route\'s paging to the end; --lines and --version bou
  await f.run(['drive','cat','notes/docs/a.md','--lines','3:']);
  assert.deepEqual(f.last().body,{path:'/docs/a.md',offset:3});
  const before=f.seen.length;
- for(const bad of [['cat','notes'],['cat','notes/a','--lines','0:2'],['cat','notes/a','--lines','5:2'],['cat','notes/a','--lines','x'],['cat','notes/a','--version','0'],['cat','notes/a','--recursive']]){
+ await mapPool([['cat','notes'],['cat','notes/a','--lines','0:2'],['cat','notes/a','--lines','5:2'],['cat','notes/a','--lines','x'],['cat','notes/a','--version','0'],['cat','notes/a','--recursive']],async bad=>{
   const refused=await f.run(['drive',...bad]);assert.equal(refused.code,2,`${bad.join(' ')}: ${refused.stdout}`);
- }
+ });
  assert.equal(f.seen.length,before);
 });
 
@@ -272,7 +275,7 @@ test('get streams a file to disk, to stdout with -, and never over an existing l
  assert.ok(!existsSync(join(f.home,'docs')),'a refused download leaves no file');
  result=await f.run(['drive','get','notes/docs','-']);
  assert.equal(result.code,4);assert.equal(result.stdout,'');assert.match(result.stderr,/cave_code_drive_is_folder/);
- for(const bad of [['get','notes'],['get','notes/docs','-','--recursive'],['get','notes/a','b','c'],['get','notes/docs','--recursive','--version','2']]){const refused=await f.run(['drive',...bad]);assert.equal(refused.code,2,bad.join(' '));}
+ await mapPool([['get','notes'],['get','notes/docs','-','--recursive'],['get','notes/a','b','c'],['get','notes/docs','--recursive','--version','2']],async bad=>{const refused=await f.run(['drive',...bad]);assert.equal(refused.code,2,bad.join(' '));});
 });
 
 test('get --recursive lists the folder to the end and writes it under LOCAL',async t=>{
@@ -303,21 +306,24 @@ test('get --recursive lists the folder to the end and writes it under LOCAL',asy
 });
 
 test('get --recursive refuses a listing that names a path outside LOCAL, and writes nothing',async t=>{
+ const badPaths=['/docs/../../escape.txt','/docs/..','/docs/a/../../../escape.txt','/docs/sub\\..\\..\\escape.txt','/docs/C:evil','/docs/.','/docs/nul','/docs/a\u0000b','/docs','/'];
+ const cases=[
+  ...badPaths.map(path=>[JSON.stringify(path),[file('/docs/fine.md'),file(path)],true]),
+  ['case-collision',[file('/docs/same.md'),file('/docs/SAME.md')],false],
+  ['symlink-kind',[{...file('/docs/x'),kind:'symlink'}],false],
+ ];
  let files=[];
- const f=await fixture(t,{
+ const routes={
   [`GET ${notes}/files`]:()=>[200,{files,next_cursor:null}],
   [`GET ${notes}/content`]:()=>[200,Buffer.from('hostile')],
+  ...Object.fromEntries(cases.map(([,listing],i)=>[`GET ${drives}/notes-${i}/files`,()=>[200,{files:listing,next_cursor:null}]])),
+ };
+ const f=await fixture(t,routes);
+ await mapPool(cases,async([label,,checkMsg],i)=>{
+  const result=await f.run(['drive','get',`notes-${i}/docs`,'local','--recursive']);
+  if(checkMsg){assert.equal(result.code,1,`${label}: ${result.stdout}`);assert.match(result.json().error.message,/Nothing was written\.$/);}
+  assert.equal(result.json().error.code,'cave_unsafe_listing',label);
  });
- for(const path of ['/docs/../../escape.txt','/docs/..','/docs/a/../../../escape.txt','/docs/sub\\..\\..\\escape.txt','/docs/C:evil','/docs/.','/docs/nul','/docs/a\u0000b','/docs','/']){
-  files=[file('/docs/fine.md'),file(path)];
-  const result=await f.run(['drive','get','notes/docs','local','--recursive']);
-  assert.equal(result.code,1,`${JSON.stringify(path)}: ${result.stdout}`);
-  assert.equal(result.json().error.code,'cave_unsafe_listing');assert.match(result.json().error.message,/Nothing was written\.$/);
- }
- files=[file('/docs/same.md'),file('/docs/SAME.md')];
- assert.equal((await f.run(['drive','get','notes/docs','local','--recursive'])).json().error.code,'cave_unsafe_listing');
- files=[{...file('/docs/x'),kind:'symlink'}];
- assert.equal((await f.run(['drive','get','notes/docs','local','--recursive'])).json().error.code,'cave_unsafe_listing');
  assert.ok(!existsSync(join(f.home,'local')),'the local folder is not even made');
  assert.ok(!existsSync(join(f.home,'escape.txt'))&&!existsSync(join(dirname(f.home),'escape.txt')));
  assert.deepEqual(f.seen.filter(r=>r.route.endsWith('/content')),[],'no file is downloaded');
@@ -442,9 +448,9 @@ test('put of one file: into a folder with a trailing slash, from stdin with -, a
  assert.deepEqual([f.last().query,f.last().headers['content-type'],f.last().headers['content-length'],f.last().headers.expect,f.last().raw.toString()],[{path:'/in/piped.txt',if_absent:'true'},'text/plain',undefined,'100-continue','from a pipe\n']);
  const before=f.seen.length;
  await symlink(join(f.home,'report.csv'),join(f.home,'alias.csv'));
- for(const bad of [['put','-','notes'],['put','-','notes/docs/'],['put','missing.txt','notes'],['put','alias.csv','notes'],['put','report.csv'],['put','report.csv','notes','--recursive']]){
+ await mapPool([['put','-','notes'],['put','-','notes/docs/'],['put','missing.txt','notes'],['put','alias.csv','notes'],['put','report.csv'],['put','report.csv','notes','--recursive']],async bad=>{
   const refused=await f.run(['drive',...bad],{},{input:''});assert.equal(refused.code,2,`${bad.join(' ')}: ${refused.stdout}`);
- }
+ });
  assert.equal(f.seen.length,before);
 });
 
@@ -543,7 +549,7 @@ test('grep sends the engine\'s input, prints path:line: text, and says when a se
  result=await f.run(['drive','grep','budget','notes','--format','table']);
  assert.equal(result.stdout,'');assert.equal(result.stderr,'No matches: 3 files searched (900 B).\n1 file that is not text was not searched.\n');
  const before=f.seen.length;
- for(const bad of [['grep','budget'],['grep','','notes'],['grep','x','notes','--limit','0'],['grep','x','notes','--limit','1001'],['grep','x','notes','--context','two']]){const refused=await f.run(['drive',...bad]);assert.equal(refused.code,2,bad.join(' '));}
+ await mapPool([['grep','budget'],['grep','','notes'],['grep','x','notes','--limit','0'],['grep','x','notes','--limit','1001'],['grep','x','notes','--context','two']],async bad=>{const refused=await f.run(['drive',...bad]);assert.equal(refused.code,2,bad.join(' '));});
  assert.equal(f.seen.length,before);
 });
 
@@ -575,9 +581,9 @@ test('mv, rm, log, changes and restore each call their route with their body',as
  const before=f.seen.length;
  result=await f.run(['drive','rm','notes/docs/a.md']);
  assert.equal(result.code,2);assert.equal(result.json().error.code,'cave_confirmation_required');
- for(const bad of [['rm','notes','--yes'],['mv','notes/a'],['mv','notes','x'],['mv','notes/a','/'],['log','notes'],['restore','notes/a'],['restore','notes/a','--version','2','--to','3'],['restore','notes','--version','2'],['restore','notes/a','--to','yesterday'],['changes','notes/docs'],['changes','notes','--after','x']]){
+ await mapPool([['rm','notes','--yes'],['mv','notes/a'],['mv','notes','x'],['mv','notes/a','/'],['log','notes'],['restore','notes/a'],['restore','notes/a','--version','2','--to','3'],['restore','notes','--version','2'],['restore','notes/a','--to','yesterday'],['changes','notes/docs'],['changes','notes','--after','x']],async bad=>{
   const refused=await f.run(['drive',...bad]);assert.equal(refused.code,2,`${bad.join(' ')}: ${refused.stdout}`);
- }
+ });
  assert.equal(f.seen.length,before,'nothing is sent for a refused command');
  result=await f.run(['drive','rm','notes/docs/a.md','--yes','--format','table']);
  assert.deepEqual([f.last().route,f.last().body],[`${notes}/delete`,{path:'/docs/a.md'}]);
@@ -684,10 +690,10 @@ test('fork, merge, diff, review, approve, reject and undo each call their route 
  assert.match(result.stdout,/conflict  \/gone\.md  deleted_in_parent: brought back with the changes\n/);
 
  const before=f.seen.length;
- for(const bad of [['fork','notes'],['fork','notes','Bad Name'],['fork','notes/docs','x'],['fork','notes','x','--at','y'],['merge','notes/docs'],['diff','notes','--from','x'],['review','notes','not-an-id'],['review','notes','--status','open'],
-  ['approve','notes'],['approve','notes','nope'],['approve','notes',changesetId],['approve','notes',changesetId,'--at','x'],['reject','notes',changesetId],['undo','notes'],['undo','notes','--session','x'],['undo','notes/docs','--session',sessionId]]){
+ await mapPool([['fork','notes'],['fork','notes','Bad Name'],['fork','notes/docs','x'],['fork','notes','x','--at','y'],['merge','notes/docs'],['diff','notes','--from','x'],['review','notes','not-an-id'],['review','notes','--status','open'],
+  ['approve','notes'],['approve','notes','nope'],['approve','notes',changesetId],['approve','notes',changesetId,'--at','x'],['reject','notes',changesetId],['undo','notes'],['undo','notes','--session','x'],['undo','notes/docs','--session',sessionId]],async bad=>{
   const refused=await f.run(['drive',...bad]);assert.equal(refused.code,2,`${bad.join(' ')}: ${refused.stdout}`);
- }
+ });
  assert.equal(f.seen.length,before,'nothing is sent for a refused command');
  result=await f.run(['drive','reject','notes',changesetId,'--yes','--format','table']);
  assert.equal(f.last().route,`${notes}/changesets/${changesetId}/reject`);
@@ -701,10 +707,10 @@ test('fork, merge, diff, review, approve, reject and undo each call their route 
  f.seen.length=0;
  result=await f.run(['drive','diff','docs','--from','1'],{CAVEMAN_DRIVE_TOKEN:token,CAVE_API_URL:f.url});
  assert.deepEqual(f.seen.map(r=>[r.method,r.route,r.query]),[['GET',`${share}/diff`,{from:'1',path:'/docs'}]]);
- for(const verb of [['fork','notes','x'],['merge','notes'],['review','notes'],['undo','notes','--session',sessionId]]){
+ await mapPool([['fork','notes','x'],['merge','notes'],['review','notes'],['undo','notes','--session',sessionId]],async verb=>{
   const refused=await f.run(['drive',...verb],{CAVEMAN_DRIVE_TOKEN:token});
   assert.equal(refused.json().error.code,'cave_share_token_scope',verb.join(' '));
- }
+ });
 });
 
 test('share prints the token once, when it ends, what it gives, the cvm line and an MCP entry; --for is 5m to 12h',async t=>{
@@ -726,30 +732,15 @@ test('share prints the token once, when it ends, what it gives, the cvm line and
   assert.deepEqual(f.last().body,{path:'/',read:false,write:true,ttl_seconds:seconds});
  }
  const before=f.seen.length;
- for(const bad of [['--read','--for','4m'],['--read','--for','299s'],['--read','--for','13h'],['--read','--for','721m'],['--read','--for','15'],['--read','--for','1d'],['--read','--for','soon'],['--read','--for',''],[],['--for','15m']]){
+ await mapPool([['--read','--for','4m'],['--read','--for','299s'],['--read','--for','13h'],['--read','--for','721m'],['--read','--for','15'],['--read','--for','1d'],['--read','--for','soon'],['--read','--for',''],[],['--for','15m']],async bad=>{
   const refused=await f.run(['drive','share','notes',...bad]);
   assert.equal(refused.code,2,`${bad.join(' ')}: ${refused.stdout}`);assert.equal(refused.json().error.code,'cave_usage');
- }
+ });
  assert.equal(f.seen.length,before,'a bad --for is refused before anything is sent');
  // An answer without a share token is not printed as one.
  const g=await fixture(t,{[`POST ${notes}/shares`]:()=>[201,{token:'\u001b[31mnot-a-token',grant:grant()}]});
  result=await g.run(['drive','share','notes','--read']);
  assert.equal(result.code,6);assert.equal(result.json().error.code,'cave_invalid_response');
-});
-
-test('share names no instance on the hosted Cloud',async()=>{
- // No server is reached: the hosted address is only read back from the output.
- const {drive:run}=await import('../bin/drive.mjs');
- const written=[];const write=process.stdout.write;
- const fetch=async()=>new Response(JSON.stringify({token,grant:grant()}),{status:201,headers:{'content-type':'application/json'}});
- const original=globalThis.fetch;globalThis.fetch=fetch;process.stdout.write=chunk=>(written.push(String(chunk)),true);
- let code;
- try{code=await run(['share','notes','--read','--format','json'],{context:async()=>({baseURL:'https://api.caveman.so',token:secret}),instance:()=>'https://api.caveman.so'});}
- finally{process.stdout.write=write;globalThis.fetch=original;}
- assert.equal(code,0,written.join(''));
- const out=JSON.parse(written.join(''));
- assert.equal(out.use,`CAVEMAN_DRIVE_TOKEN=${token} cvm drive ls`);
- assert.equal(JSON.parse(out.mcp).mcpServers['caveman-drive'].url,'https://api.caveman.so/api/v1/code/share/mcp');
 });
 
 test('grants, grant and revoke each call their route',async t=>{
@@ -779,9 +770,9 @@ test('grants, grant and revoke each call their route',async t=>{
  assert.deepEqual([f.last().method,f.last().route,f.last().body],['POST',`${notes}/grants/${grantId}/revoke`,{}]);
  assert.equal(result.stdout,`revoked  ${grantId}  share token  2026-11-18T10:30:00Z\n`);
  const before=f.seen.length;
- for(const bad of [['grant','notes','--read'],['grant','notes','--to','deploy-bot','--read'],['grant','notes','--to',accountId],['grant','notes','--to',accountId,'--read','--until','soon'],['revoke','notes'],['revoke','notes','../../archive'],['revoke','notes/docs',grantId],['grants']]){
+ await mapPool([['grant','notes','--read'],['grant','notes','--to','deploy-bot','--read'],['grant','notes','--to',accountId],['grant','notes','--to',accountId,'--read','--until','soon'],['revoke','notes'],['revoke','notes','../../archive'],['revoke','notes/docs',grantId],['grants']],async bad=>{
   const refused=await f.run(['drive',...bad]);assert.equal(refused.code,2,`${bad.join(' ')}: ${refused.stdout}`);
- }
+ });
  assert.equal(f.seen.length,before);
 });
 
@@ -802,7 +793,7 @@ test('a share token works with an empty HOME: the share mount, the token as the 
  const f=await fixture(t,shared(),{signedIn:false});
  const env={CAVEMAN_DRIVE_TOKEN:token,CAVE_API_URL:f.url};
  await f.write('new.md','# new\n');
- for(const [args,method,route,sent] of [
+ await mapPool([
   [['drive'],'GET',share,undefined],
   [['drive','ls'],'GET',`${share}/files`,{path:'/',limit:'1000'}],
   [['drive','ls','sub','--recursive'],'GET',`${share}/files`,{path:'/sub',recursive:'true',limit:'1000'}],
@@ -815,14 +806,18 @@ test('a share token works with an empty HOME: the share mount, the token as the 
   [['drive','mv','a.md','sub/a.md'],'POST',`${share}/move`,{from:'/a.md',to:'/sub/a.md'}],
   [['drive','rm','a.md','--yes'],'POST',`${share}/delete`,{path:'/a.md'}],
   [['drive','log','a.md'],'GET',`${share}/history`,{path:'/a.md',limit:'1000'}],
- ]){
-  const result=await f.run(args,env);
+ ],async([args,method,route,sent],index)=>{
+  const caseToken=`${token}-${index}`;
+  const result=await f.run(args,{CAVEMAN_DRIVE_TOKEN:caseToken,CAVE_API_URL:f.url});
   assert.equal(result.code,0,`${args.join(' ')}: ${result.stdout}${result.stderr}`);
-  const req=f.last();
-  assert.deepEqual([req.method,req.route,req.method==='POST'?req.body:req.method==='GET'&&sent===undefined?undefined:req.query],[method,route,sent],args.join(' '));
-  assert.equal(req.headers.authorization,`Bearer ${token}`,args.join(' '));
+  const own=f.seen.filter(req=>req.headers.authorization===`Bearer ${caseToken}`);
+  assert.equal(own.length,1,args.join(' '));
+  const [req]=own;
+  assert.equal(req.method,method,args.join(' '));
+  assert.equal(req.route,route,args.join(' '));
+  if(sent!==undefined)assert.deepEqual(req.method==='POST'?req.body:req.query,sent,args.join(' '));
   JSON.parse(result.stdout);
- }
+ });
  assert.equal(await readFile(join(f.home,'copy.md'),'utf8'),'# a\n');
  assert.deepEqual((await readdir(f.home)).sort(),['copy.md','new.md'],'nothing is saved in the home: no config, no credential, no token');
  // --token and --instance say the same as the two variables.
@@ -833,15 +828,17 @@ test('a share token works with an empty HOME: the share mount, the token as the 
  assert.match(result.stdout,/^NAME {2}SIZE {2}TOKENS {2}WRITER {2}VERSION {2}CHANGED\na\.md {2}12 B {2}4 {7}person {2}v3 /);
  // What a share token cannot do is refused here, and nothing is sent.
  const before=f.seen.length;
- for(const [args,what] of [[['list'],'list drives'],[['create','x'],'create a drive'],[['changes','notes'],'read a drive\'s changes'],[['restore','a.md','--version','2'],'restore'],[['share','notes','--read'],'make another share'],[['grants','notes'],'list a drive\'s grants'],
-  [['grant','notes','--to',accountId,'--read'],'give a grant'],[['revoke','notes',grantId],'revoke a grant'],[['verify','notes'],'verify a drive'],[['archive','notes','--yes'],'archive a drive']]){
-  result=await f.run(['drive',...args],env);
-  assert.equal(result.code,2,args.join(' '));
-  assert.deepEqual(result.json().error,{code:'cave_share_token_scope',message:`A share token cannot ${what}: that takes a signed-in cvm (cvm login, with CAVEMAN_DRIVE_TOKEN unset).`});
- }
- for(const bad of [['drive','ls','--token','not-a-token'],['drive','ls','--token','cdrv_short'],['drive','ls','--instance','not a url','--token',token],['drive','cat'],['drive','mv','a.md']]){
-  result=await f.run(bad,bad.includes('--token')?{CAVE_API_URL:f.url}:env);assert.equal(result.code,2,bad.join(' '));assert.equal(result.json().error.code,'cave_usage');
- }
+ await Promise.all([
+  mapPool([[['list'],'list drives'],[['create','x'],'create a drive'],[['changes','notes'],'read a drive\'s changes'],[['restore','a.md','--version','2'],'restore'],[['share','notes','--read'],'make another share'],[['grants','notes'],'list a drive\'s grants'],
+   [['grant','notes','--to',accountId,'--read'],'give a grant'],[['revoke','notes',grantId],'revoke a grant'],[['verify','notes'],'verify a drive'],[['archive','notes','--yes'],'archive a drive']],async([args,what])=>{
+   const res=await f.run(['drive',...args],env);
+   assert.equal(res.code,2,args.join(' '));
+   assert.deepEqual(res.json().error,{code:'cave_share_token_scope',message:`A share token cannot ${what}: that takes a signed-in cvm (cvm login, with CAVEMAN_DRIVE_TOKEN unset).`});
+  }),
+  mapPool([['drive','ls','--token','not-a-token'],['drive','ls','--token','cdrv_short'],['drive','ls','--instance','not a url','--token',token],['drive','cat'],['drive','mv','a.md']],async bad=>{
+   const res=await f.run(bad,bad.includes('--token')?{CAVE_API_URL:f.url}:env);assert.equal(res.code,2,bad.join(' '));assert.equal(res.json().error.code,'cave_usage');
+  }),
+ ]);
  assert.equal(f.seen.length,before);
  // Without a token and without a sign-in, the answer says both ways in.
  result=await f.run(['drive','ls','notes'],{CAVE_API_URL:f.url});
@@ -869,9 +866,9 @@ test('a share token is the only credential sent, also on a machine that is signe
  // A token typed where an address goes is not echoed in the usage answer either.
  result=await f.run(['drive','ls',token]);
  assert.equal(result.code,2);
- for(const args of [['drive','put','missing.md'],['drive','get','a.md','copy.md'],['drive','cat','a.md','--format','table'],['drive','rm','a.md'],['drive','--help']]){
-  result=await f.run(args,{CAVEMAN_DRIVE_TOKEN:token});assert.ok(result.code!==undefined);
- }
+ await mapPool([['drive','put','missing.md'],['drive','get','a.md','copy.md'],['drive','cat','a.md','--format','table'],['drive','rm','a.md'],['drive','--help']],async args=>{
+  const r=await f.run(args,{CAVEMAN_DRIVE_TOKEN:token});assert.ok(r.code!==undefined);
+ });
  for(const entry of await readdir(f.home,{recursive:true}))if((await lstat(join(f.home,entry))).isFile())assert.ok(!(await readFile(join(f.home,entry),'utf8')).includes('cdrv_'),`${entry} holds no share token`);
 });
 
@@ -913,33 +910,40 @@ test('put of a folder with a share token: create-only without --overwrite, versi
 
 test('drives switched off, or a Cloud older than drives, is said in plain words; any other refusal is the API\'s message, once',async t=>{
  const off='Drives are off on this Caveman Cloud: an operator turns them on with the chart\'s code.drives.enabled.';
- let reply=refusal(404,'cave_code_drives_off',off);
- const f=await fixture(t,{[`GET ${drives}`]:()=>reply,[`GET ${notes}/files`]:()=>reply,[`PUT ${notes}/content`]:()=>reply,[`GET ${notes}/content`]:()=>reply,[`GET ${share}/files`]:()=>reply,[`POST ${notes}/uploads`]:()=>reply});
- await f.write('a.md','# a\n');
- await f.write('big.bin',Buffer.alloc(8*1024*1024+1));
- const every=[[['drive']],[['drive','ls','notes']],[['drive','put','a.md','notes']],[['drive','put','big.bin','notes']],[['drive','get','notes/a.md','b.md']],[['drive','ls'],{CAVEMAN_DRIVE_TOKEN:token}],[['drive','put','a.md','notes','--overwrite'],{CAVE_TOKEN:key}]];
- for(const old of [false,true]){
+ const makeOff=reply=>fixture(t,{[`GET ${drives}`]:()=>reply,[`GET ${notes}/files`]:()=>reply,[`PUT ${notes}/content`]:()=>reply,[`GET ${notes}/content`]:()=>reply,[`GET ${share}/files`]:()=>reply,[`POST ${notes}/uploads`]:()=>reply});
+ const [fNew,fOld,fBare]=await Promise.all([
+  makeOff(refusal(404,'cave_code_drives_off',off)),
   // The release before said it as cave_not_found; cvm says it the one way.
-  if(old)reply=refusal(404,'cave_not_found','Drives are not enabled on this installation.');
+  makeOff(refusal(404,'cave_not_found','Drives are not enabled on this installation.')),
+  // A Cloud with no drive routes at all answers a bare 404.
+  makeOff([404,'404 page not found\n']),
+ ]);
+ const big=Buffer.alloc(8*1024*1024+1);
+ await Promise.all([fNew,fOld].flatMap(f=>[f.write('a.md','# a\n'),f.write('big.bin',big)]));
+ const every=[[['drive']],[['drive','ls','notes']],[['drive','put','a.md','notes']],[['drive','put','big.bin','notes']],[['drive','get','notes/a.md','b.md']],[['drive','ls'],{CAVEMAN_DRIVE_TOKEN:token}],[['drive','put','a.md','notes','--overwrite'],{CAVE_TOKEN:key}]];
+ const offCases=[];
+ for(const f of [fNew,fOld]){
   for(const [args,env] of every){
-   let result=await f.run(args,env);
-   assert.equal(result.code,1,args.join(' '));
-   assert.deepEqual(result.json().error,{code:'cave_code_drives_off',message:off},args.join(' '));
-   result=await f.run([...args,'--format','table'],env);
-   assert.equal(result.code,1,args.join(' '));
-   assert.equal(result.stdout,off+'\n',args.join(' '));
+   offCases.push([f,args,env,false]);
+   offCases.push([f,[...args,'--format','table'],env,true]);
   }
  }
- let result;
- // A Cloud with no drive routes at all answers a bare 404.
- reply=[404,'404 page not found\n'];
- for(const args of [['drive'],['drive','ls','notes'],['drive','get','notes/a.md','b.md']]){
-  result=await f.run(args);
-  assert.equal(result.code,1);
-  assert.deepEqual(result.json().error,{code:'cave_not_found',message:'This Caveman Cloud serves no drives: they are switched off on this installation, or it is older than drives.'},args.join(' '));
- }
- reply=refusal(403,'cave_forbidden','Only a person can share a drive: ask one to.\u001b[31m');
- result=await f.run(['drive'],{CAVE_TOKEN:key});
+ await Promise.all([
+  mapPool(offCases,async([f,args,env,table])=>{
+   const res=await f.run(args,env);
+   assert.equal(res.code,1,args.join(' '));
+   if(table)assert.equal(res.stdout,off+'\n',args.join(' '));
+   else assert.deepEqual(res.json().error,{code:'cave_code_drives_off',message:off},args.join(' '));
+  }),
+  mapPool([['drive'],['drive','ls','notes'],['drive','get','notes/a.md','b.md']],async args=>{
+   const res=await fBare.run(args);
+   assert.equal(res.code,1);
+   assert.deepEqual(res.json().error,{code:'cave_not_found',message:'This Caveman Cloud serves no drives: they are switched off on this installation, or it is older than drives.'},args.join(' '));
+  }),
+ ]);
+ let reply=refusal(403,'cave_forbidden','Only a person can share a drive: ask one to.\u001b[31m');
+ const f=await fixture(t,{[`GET ${drives}`]:()=>reply});
+ let result=await f.run(['drive'],{CAVE_TOKEN:key});
  assert.equal(result.code,3);assert.deepEqual(result.json().error,{code:'cave_forbidden',message:'Only a person can share a drive: ask one to.'});
  reply=[502,`<html>${secret}</html>`];
  result=await f.run(['drive']);
@@ -952,24 +956,29 @@ test('drives switched off, or a Cloud older than drives, is said in plain words;
 test('help answers without a sign-in or a request, for the family and for each verb',async t=>{
  const f=await fixture(t,{},{signedIn:false});
  const verbs=['list','create','ls','cat','get','put','grep','mv','rm','log','changes','restore','share','grants','grant','revoke','verify','archive','unarchive','set','usage','fork','merge','diff','review','approve','reject','undo','mount'];
- const top=(await f.run(['drive','--help'])).json();
+ const [topRes,dispatcher,verbResults,screen,rootHelp]=await Promise.all([
+  f.run(['drive','--help']),
+  readFile(bin,'utf8'),
+  mapPool(verbs.slice(1),verb=>f.run(['drive',verb,'--help'])),
+  f.run(['drive','--help','--format','table']),
+  f.run(['--help','--format','json']),
+ ]);
+ const top=topRes.json();
  assert.match(top.usage,/^cvm drive /);
  assert.deepEqual(top.commands.map(c=>c.verb),verbs);
  // The rows cvm.mjs lists under the drive family say what each verb's own help says.
- const dispatcher=await readFile(bin,'utf8');
  for(const command of top.commands){assert.match(command.usage,/^cvm drive /);assert.ok(dispatcher.includes(`{id:'drive.${command.verb}',usage:'${command.usage}',`),`cvm.mjs lists cvm drive ${command.verb} as its help does`);}
- for(const verb of verbs.slice(1)){
-  const result=await f.run(['drive',verb,'--help']);
+ verbs.slice(1).forEach((verb,i)=>{
+  const result=verbResults[i];
   assert.equal(result.code,0,result.stdout);assert.match(result.json().usage,new RegExp(`^cvm drive ${verb}( |$)`));
- }
+ });
  const getHelp=top.commands.find(c=>c.verb==='get');
  assert.match(getHelp.usage,/ \[--include-protected\] \[--force\]$/);
  assert.match(getHelp.summary,/is skipped and listed on stderr, and the exit is 4, unless --include-protected\./);assert.match(getHelp.summary,/To a terminal, - writes the bytes only with --force\.$/);
  assert.ok(top.notes.some(note=>/show a control or an invisible character as an escape/.test(note)));
- const screen=await f.run(['drive','--help','--format','table']);
  assert.match(screen.stdout,/^Drives: versioned file trees an organization shares with its agents\.\n\n {2}cvm drive \[list\]\n {6}The drives you can reach\.\n/);
  assert.match(screen.stdout,/\nWith a share token \(--token cdrv_\.\.\., or CAVEMAN_DRIVE_TOKEN\) there is no drive and no sign-in/);
- assert.ok((await f.run(['--help','--format','json'])).json().families.includes('drive'));
+ assert.ok(rootHelp.json().families.includes('drive'));
  assert.deepEqual(f.seen,[]);
 });
 
@@ -1023,10 +1032,10 @@ test('get skips a name a tool runs or obeys, says each on stderr and in the answ
  assert.equal(result.code,4);
  assert.deepEqual(result.json(),{schema_version:1,ok:false,status:'skipped',files:[],bytes:0,skipped:[{path:'/docs/CLAUDE.md',reason}],hint:single});
  assert.equal(result.stderr,`skipped  notes/docs/CLAUDE.md  ${reason}\n${single}\n`);
- for(const address of ['notes/.git/config','notes/a/.VSCode/tasks.json','notes/.envrc','notes/x/GIT~1/config','notes/docs/agents.MD']){
-  result=await f.run(['drive','get',address,'got.txt']);
-  assert.equal(result.code,4,address);assert.equal(result.json().status,'skipped',address);
- }
+ await mapPool(['notes/.git/config','notes/a/.VSCode/tasks.json','notes/.envrc','notes/x/GIT~1/config','notes/docs/agents.MD'],async address=>{
+  const r=await f.run(['drive','get',address,'got.txt']);
+  assert.equal(r.code,4,address);assert.equal(r.json().status,'skipped',address);
+ });
  result=await f.run(['drive','get','AGENTS.md'],{CAVEMAN_DRIVE_TOKEN:token});
  assert.equal(result.code,4);assert.equal(result.stderr,`skipped  /AGENTS.md  ${reason}\n${single}\n`);
  assert.equal(f.seen.length,before,'nothing is asked of the server for a name that is skipped');
@@ -1249,10 +1258,10 @@ test('put: a part that keeps failing stops the put with its upload id; --resume 
  result=await f.run(['drive','put','small.bin','notes/big.bin','--resume',UPLOAD]);
  assert.equal(result.code,2);assert.equal(result.json().error.code,'cave_resume_mismatch');
  const sent=f.seen.length;
- for(const args of [['dir','notes/big.bin','--resume',UPLOAD],['-','notes/big.bin','--resume',UPLOAD],['big.bin','notes/big.bin','--resume','nope'],['big.bin','notes/big.bin','--resume',UPLOAD,'--dry-run']]){
-  result=await f.run(['drive','put',...args]);
-  assert.equal(result.code,2,args.join(' '));
- }
+ await mapPool([['dir','notes/big.bin','--resume',UPLOAD],['-','notes/big.bin','--resume',UPLOAD],['big.bin','notes/big.bin','--resume','nope'],['big.bin','notes/big.bin','--resume',UPLOAD,'--dry-run']],async args=>{
+  const r=await f.run(['drive','put',...args]);
+  assert.equal(r.code,2,args.join(' '));
+ });
  assert.equal(f.seen.length,sent);
 });
 
@@ -1292,11 +1301,11 @@ async function ranged(t,content,{cut=false,swap,other=Buffer.alloc(content.lengt
  await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
  const dir=await mkdtemp(join(tmpdir(),'cvm-drive-'));
  t.after(async()=>{server.closeAllConnections();await new Promise(resolve=>server.close(resolve));await rm(dir,{recursive:true,force:true});});
- const run=args=>new Promise((resolve,reject)=>{
+ const run=args=>limitSpawn(()=>new Promise((resolve,reject)=>{
   const child=spawn(process.execPath,[bin,'drive',...args,'--token',token,'--instance',`http://127.0.0.1:${server.address().port}`],{cwd:dir,env:{HOME:dir,USERPROFILE:dir,CAVEMAN_HOME:join(dir,'.caveman'),PATH:'/usr/bin:/bin',CAVE_NO_KEYCHAIN:'1',CAVE_NO_BROWSER:'1'},stdio:['ignore','pipe','pipe']});
   const out=[];let stderr='';child.stdout.on('data',d=>out.push(d));child.stderr.on('data',d=>stderr+=d);
   child.on('error',reject);child.on('close',code=>{const bytes=Buffer.concat(out);resolve({code,bytes,stderr,json:()=>JSON.parse(bytes.toString('utf8'))});});
- });
+ }));
  return {seen,dir,run};
 }
 
@@ -1332,4 +1341,21 @@ test('get: a range of another version than the first is refused and leaves nothi
  assert.equal(result.code,0,result.bytes.toString());
  assert.equal((await readFile(join(empty.dir,'empty.txt'))).length,0);
  assert.deepEqual(empty.seen.map(r=>r.range),['bytes=0-67108863',undefined]);
+});
+
+});
+
+test('share names no instance on the hosted Cloud',async()=>{
+ // No server is reached: the hosted address is only read back from the output.
+ const {drive:run}=await import('../bin/drive.mjs');
+ const written=[];const write=process.stdout.write;
+ const fetch=async()=>new Response(JSON.stringify({token,grant:grant()}),{status:201,headers:{'content-type':'application/json'}});
+ const original=globalThis.fetch;globalThis.fetch=fetch;process.stdout.write=chunk=>(written.push(String(chunk)),true);
+ let code;
+ try{code=await run(['share','notes','--read','--format','json'],{context:async()=>({baseURL:'https://api.caveman.so',token:secret}),instance:()=>'https://api.caveman.so'});}
+ finally{process.stdout.write=write;globalThis.fetch=original;}
+ assert.equal(code,0,written.join(''));
+ const out=JSON.parse(written.join(''));
+ assert.equal(out.use,`CAVEMAN_DRIVE_TOKEN=${token} cvm drive ls`);
+ assert.equal(JSON.parse(out.mcp).mcpServers['caveman-drive'].url,'https://api.caveman.so/api/v1/code/share/mcp');
 });

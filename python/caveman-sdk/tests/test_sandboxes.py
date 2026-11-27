@@ -575,18 +575,20 @@ def test_waiting_reads_until_the_state_and_stops_on_a_failure_or_another_ask():
         f.close()
 
 
-def test_the_api_holds_the_read_until_the_state_and_a_cloud_that_does_not_wait_is_polled():
+def test_the_api_holds_the_read_until_the_state_and_a_cloud_that_does_not_wait_is_polled(monkeypatch):
     asked: list[str] = []
     state: dict[str, Any] = {"answers": [("running", "satisfied", 0.0)]}
+    now = [1000.0]
 
     def rest(h, _body):
         asked.append(urllib.parse.urlsplit(h.path).query)
         answers = state["answers"]
         observed, wait, after, *code = answers.pop(0) if len(answers) > 1 else answers[0]
-        time.sleep(after)
+        now[0] += after
         found = dict(WIRE["rest"]["get"]["answer"], observed_state=observed, **({"observed_reason_code": code[0]} if code else {}))
         answer(h, 200, json.dumps(found).encode(), {"cave-wait": wait} if wait else None)
 
+    monkeypatch.setattr("caveman_cloud.sandboxes.time.monotonic", lambda: now[0])
     f = Fake(rest)
     try:
         sandboxes = client(f.url)

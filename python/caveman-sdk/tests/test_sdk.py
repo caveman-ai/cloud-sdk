@@ -313,7 +313,7 @@ def test_gateway_and_eval_clients_never_follow_a_redirect_with_credentials() -> 
 
     gateway = ThreadingHTTPServer(("127.0.0.1", 0), Gateway)
     for server in (elsewhere, gateway):
-        threading.Thread(target=server.serve_forever, daemon=True).start()
+        threading.Thread(target=server.serve_forever, kwargs={"poll_interval": 0.01}, daemon=True).start()
     try:
         base_url = f"http://127.0.0.1:{gateway.server_port}"
         cave = Cave(api_key="cave-secret", base_url=base_url, agent="a")
@@ -484,7 +484,7 @@ def test_model_calls_raise_the_gateway_error_and_refuse_caller_mistakes_before_t
             pass
 
     gateway = ThreadingHTTPServer(("127.0.0.1", 0), Gateway)
-    threading.Thread(target=gateway.serve_forever, daemon=True).start()
+    threading.Thread(target=gateway.serve_forever, kwargs={"poll_interval": 0.01}, daemon=True).start()
     try:
         cave = Cave(api_key="k", base_url=f"http://127.0.0.1:{gateway.server_port}", agent="a")
         with pytest.raises(ValueError, match="query must be a non-blank string"):

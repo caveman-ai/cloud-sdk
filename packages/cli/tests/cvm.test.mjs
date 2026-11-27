@@ -1,4 +1,4 @@
-import test from 'node:test';
+import test, {describe} from 'node:test';
 import assert from 'node:assert/strict';
 import {spawn} from 'node:child_process';
 import {createServer} from 'node:http';
@@ -7,6 +7,7 @@ import {readFileSync,realpathSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {fileURLToPath} from 'node:url';
+import {TEST_CONCURRENCY,limitSpawn} from './pool.mjs';
 
 const cvm=fileURLToPath(new URL('../bin/cvm.mjs',import.meta.url));
 const whoami=JSON.parse(await readFile(new URL('../../../contracts/operations.public.json',import.meta.url),'utf8')).operations.find(o=>o.id==='context.whoami');
@@ -22,20 +23,22 @@ async function home(){
 // The scratch HOME holds every agent's config, and PATH reaches no real agent
 // CLI: setup never touches this machine's own agents.
 function run(args,{dir,env={},input}={}){
- return new Promise(resolve=>{
+ return limitSpawn(()=>new Promise(resolve=>{
   const base={...process.env};for(const k of ['CAVE_TOKEN','CAVE_API_URL','CAVE_PROJECT_ID','CAVE_CLOUD_PROFILE','CLAUDE_CONFIG_DIR','CODEX_HOME','XDG_CONFIG_HOME'])delete base[k];
   const child=spawn(process.execPath,[cvm,...args],{cwd:dir,env:{...base,HOME:dir,USERPROFILE:dir,APPDATA:join(dir,'AppData','Roaming'),...process.platform==='win32'?{}:{PATH:'/usr/bin:/bin'},CAVEMAN_HOME:join(dir,'.caveman'),CAVE_NO_KEYCHAIN:'1',CAVE_NO_BROWSER:'1',...env}});
   let stdout='',stderr='';child.stdout.on('data',d=>stdout+=d);child.stderr.on('data',d=>stderr+=d);
   if(input!==undefined)child.stdin.end(input);
   child.on('close',code=>resolve({code,stdout,stderr}));
- });
+ }));
 }
 async function cloud(handler){
  const seen=[];
  const server=createServer((req,res)=>{let body='';req.on('data',d=>body+=d);req.on('end',async()=>{seen.push({path:req.url,auth:req.headers.authorization,body});const [status,reply]=await handler(req,body);res.writeHead(status,{'content-type':'application/json'});res.end(JSON.stringify(reply));});});
  await new Promise(r=>server.listen(0,'127.0.0.1',r));
- return {seen,url:`http://127.0.0.1:${server.address().port}`,close:()=>server.close()};
+ return {seen,url:`http://127.0.0.1:${server.address().port}`,close:()=>{server.closeAllConnections();server.close();}};
 }
+
+describe('cvm', {concurrency: TEST_CONCURRENCY}, () => {
 
 test('uses caveman login\'s stored credential and writes a refreshed pair back to the same store',async()=>{
  const dir=await home();
@@ -174,26 +177,29 @@ test('mcp tool calls use the stored credential',async()=>{
 test('a first run with no config prints usage for no arguments, --help and help',async()=>{
  const dir=await mkdtemp(join(tmpdir(),'cvm-'));
  try{
-  for(const args of [[],['--help'],['help']]){
+  await Promise.all([[],['--help'],['help']].map(async args=>{
    const result=await run(args,{dir});
    assert.equal(result.code,0,result.stdout);
    assert.match(JSON.parse(result.stdout).usage,/^cvm /);
-  }
+  }));
  }finally{await rm(dir,{recursive:true,force:true});}
 });
 
 test('help lists what cvm answers itself: setup and login on the screen, evals init in its family, cvm mcp --help its usage',async()=>{
  const dir=await mkdtemp(join(tmpdir(),'cvm-'));
  try{
-  const screen=await run(['--help','--format','table'],{dir});
+  const [screen,evalsRes,mcp,typo]=await Promise.all([
+   run(['--help','--format','table'],{dir}),
+   run(['evals','--help'],{dir}),
+   run(['mcp','--help'],{dir}),
+   run(['tracs','list'],{dir}),
+  ]);
   assert.equal(screen.code,0,screen.stdout);
   assert.match(screen.stdout,/\n {2}cvm setup +connect your coding agents/);
   assert.match(screen.stdout,/\n {2}cvm login \| cvm logout +sign in with the browser/);
-  const evals=JSON.parse((await run(['evals','--help'],{dir})).stdout);
+  const evals=JSON.parse(evalsRes.stdout);
   for(const verb of ['init','ci','watch','run','compare'])assert.ok(evals.verbs.some(row=>row.verb===verb),verb);
-  const mcp=await run(['mcp','--help'],{dir});
   assert.equal(mcp.code,0);assert.deepEqual(JSON.parse(mcp.stdout),{usage:'cvm mcp',summary:'Serve the Cloud MCP server over stdio.'});
-  const typo=await run(['tracs','list'],{dir});
   assert.equal(typo.code,2);assert.match(JSON.parse(typo.stdout).error.message,/Did you mean cvm traces\?/);
  }finally{await rm(dir,{recursive:true,force:true});}
 });
@@ -448,14 +454,18 @@ test('login: a denied grant and a closed installation exit 3 and say so',async()
  const denied=await device({token:()=>[400,{error:'access_denied'}]});
  const closed=await cloud(()=>[403,{error:{code:'cave_device_login_disabled',message:'Device login is not open on this installation.'}}]);
  try{
-  const refused=await run(['login'],{dir:await home(),env:{CAVE_API_URL:denied.url}});
+  const [refused,shut,plainHttp,withPath]=await Promise.all([
+   run(['login'],{dir:await home(),env:{CAVE_API_URL:denied.url}}),
+   run(['login','--no-browser'],{dir:await home(),env:{CAVE_API_URL:closed.url}}),
+   run(['login','--instance','http://example.test'],{dir:await home()}),
+   run(['login','--instance','https://example.test/api'],{dir:await home()}),
+  ]);
   assert.equal(refused.code,3);
   assert.match(JSON.parse(refused.stdout).error.message,/denied/);
-  const shut=await run(['login','--no-browser'],{dir:await home(),env:{CAVE_API_URL:closed.url}});
   assert.equal(shut.code,3);
   assert.equal(JSON.parse(shut.stdout).error.code,'cave_device_login_disabled');
-  assert.equal((await run(['login','--instance','http://example.test'],{dir:await home()})).code,2,'plain HTTP only on localhost');
-  assert.equal((await run(['login','--instance','https://example.test/api'],{dir:await home()})).code,2,'an origin, no path');
+  assert.equal(plainHttp.code,2,'plain HTTP only on localhost');
+  assert.equal(withPath.code,2,'an origin, no path');
  }finally{denied.close();closed.close();}
 });
 
@@ -742,9 +752,9 @@ fs.writeFileSync(file,JSON.stringify(config,null,2));
 });
 
 test('from the npx cache setup installs cvm globally and points the agents at it; when npm cannot, at npx',{skip:process.platform==='win32'&&'a shell stub'},async()=>{
- const api=await device();
- try{
-  for(const fails of [false,true]){
+ await Promise.all([false,true].map(async fails=>{
+  const api=await device();
+  try{
    const dir=await home(),bin=join(dir,'bin'),global=join(dir,'global'),cached=join(dir,'.npm','_npx','f00','node_modules','@caveman-ai','cloud');
    await mkdir(bin);await mkdir(join(dir,'.cursor'));
    for(const part of ['bin','dist','package.json'])await cp(fileURLToPath(new URL(`../${part}`,import.meta.url)),join(cached,part),{recursive:true});
@@ -757,10 +767,10 @@ fs.cpSync(${JSON.stringify(cached)},path.join(root,'@caveman-ai','cloud'),{recur
 fs.mkdirSync(path.join(${JSON.stringify(global)},'bin'),{recursive:true});
 fs.symlinkSync(path.join(root,'@caveman-ai','cloud','bin','cvm.mjs'),path.join(${JSON.stringify(global)},'bin','cvm'));
 `,{mode:0o755});
-   const result=await new Promise(resolve=>{
+   const result=await limitSpawn(()=>new Promise(resolve=>{
     const child=spawn(process.execPath,[join(cached,'bin','cvm.mjs'),'setup','--project',project,'--agent','claude,cursor'],{cwd:dir,env:{HOME:dir,PATH:`${bin}:${join(global,'bin')}:/usr/bin:/bin`,CAVEMAN_HOME:join(dir,'.caveman'),CAVE_NO_KEYCHAIN:'1',CAVE_TOKEN:'ci-token',CAVE_API_URL:api.url}});
     let stdout='';child.stdout.on('data',d=>stdout+=d);child.on('close',code=>resolve({code,stdout}));
-   });
+   }));
    assert.equal(result.code,0,result.stdout);
    const installed=join(global,'lib','node_modules','@caveman-ai','cloud','bin','cvm.mjs'),npx=['npx','-y',`@caveman-ai/cloud@${version}`,'mcp'];
    const claude=JSON.parse(await readFile(join(dir,'.claude.json'),'utf8')).mcpServers['caveman-cloud'],cursor=JSON.parse(await readFile(join(dir,'.cursor','mcp.json'),'utf8')).mcpServers['caveman-cloud'];
@@ -768,9 +778,8 @@ fs.symlinkSync(path.join(root,'@caveman-ai','cloud','bin','cvm.mjs'),path.join($
    assert.deepEqual([cursor.command,...cursor.args],fails?npx:[process.execPath,installed,'mcp']);
    const install=JSON.parse(api.seen.filter(s=>s.path.endsWith('/wizard.update')).at(-1).body).tasks[0];
    assert.deepEqual([install.status,install.detail],fails?['failed','npm i -g failed (EACCES) · the MCP server runs through npx']:['done',`cvm ${version} installed`]);
-   api.seen.length=0;
-  }
- }finally{api.close();}
+  }finally{api.close();}
+ }));
 });
 
 // A copy of the package somewhere else: its MCP entries run a different cvm.mjs.
@@ -779,10 +788,10 @@ async function packageCopy(dir){
  for(const part of ['bin','dist','package.json'])await cp(fileURLToPath(new URL(`../${part}`,import.meta.url)),join(copy,part),{recursive:true});
  return realpathSync(join(copy,'bin','cvm.mjs'));
 }
-const runAt=(script,args,{dir,env})=>new Promise(resolve=>{
+const runAt=(script,args,{dir,env})=>limitSpawn(()=>new Promise(resolve=>{
  const child=spawn(process.execPath,[script,...args],{cwd:dir,env:{HOME:dir,USERPROFILE:dir,APPDATA:join(dir,'AppData','Roaming'),PATH:'/usr/bin:/bin',CAVEMAN_HOME:join(dir,'.caveman'),CAVE_NO_KEYCHAIN:'1',...env}});
  let stdout='';child.stdout.on('data',d=>stdout+=d);child.on('close',code=>resolve({code,stdout}));
-});
+}));
 
 test('a server pasted beside cvm\'s entry survives a re-run with another command and --remove, and the file always parses',async()=>{
  const dir=await home(),config=join(dir,'.cursor','mcp.json');
@@ -837,4 +846,6 @@ test('versions compare as semver, prereleases included',async()=>{
  const order=['0.0.0','0.1.0-rc.2','0.1.0-rc.10','0.1.0-rc.10.1','0.1.0-rc.x','0.1.0','0.1.1','0.10.0','1.0.0-alpha','1.0.0'];
  for(const [i,a] of order.entries())for(const [j,b] of order.entries())assert.equal(older(a,b),i<j,`${a} < ${b}`);
  assert.deepEqual([older('garbage','0.0.1'),older('0.0.1','garbage'),older(undefined,undefined)],[true,false,false]);
+});
+
 });
