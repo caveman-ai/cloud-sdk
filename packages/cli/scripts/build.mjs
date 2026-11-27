@@ -2,55 +2,61 @@
 // Standalone cvm build inside caveman-ai/cloud-sdk — reads sanitized contracts,
 // @caveman-ai/sdk sandboxes, and skills/. Zero private Cloud imports.
 import { build } from 'esbuild';
-import { copyFile, mkdir, readdir, readFile, rm, stat } from 'node:fs/promises';
+import { copyFile, mkdir, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { join, relative, resolve } from 'node:path';
 
 const cliRoot = resolve(import.meta.dirname, '..');
 const platRoot = resolve(cliRoot, '../..');
 const distDir = resolve(cliRoot, 'dist');
+const manifestPath = resolve(distDir, '.build-manifest.json');
+const inputPaths = [
+  resolve(cliRoot, 'client'),
+  resolve(cliRoot, 'scripts/build.mjs'),
+  resolve(platRoot, 'packages/sdk-ts/src'),
+  resolve(platRoot, 'contracts/criterion-registry.json'),
+  resolve(platRoot, 'contracts/operations.public.json'),
+  resolve(platRoot, 'skills'),
+];
 
-async function maxMtime(paths) {
-  let newest = 0;
-  for (const p of paths) {
+async function snapshotTree(paths, baseDir, ignoreName = '') {
+  const entries = [];
+  async function walk(p) {
     let st;
-    try { st = await stat(p); } catch { continue; }
+    try { st = await stat(p); } catch { return; }
     if (st.isDirectory()) {
-      const entries = await readdir(p, { withFileTypes: true });
-      const nested = await maxMtime(entries.map((e) => join(p, e.name)));
-      if (nested > newest) newest = nested;
-    } else if (st.mtimeMs > newest) {
-      newest = st.mtimeMs;
+      const children = await readdir(p, { withFileTypes: true });
+      children.sort((a, b) => a.name.localeCompare(b.name));
+      for (const child of children) {
+        if (ignoreName && child.name === ignoreName) continue;
+        await walk(join(p, child.name));
+      }
+    } else {
+      entries.push([relative(baseDir, p), st.mtimeMs, st.size]);
     }
   }
-  return newest;
+  for (const p of paths) await walk(p);
+  return entries;
 }
 
 if (process.argv.includes('--if-stale')) {
-  const outputs = [
-    resolve(distDir, 'cloud-client.mjs'),
-    resolve(distDir, 'cloud-mcp.mjs'),
-    resolve(distDir, 'sandboxes.mjs'),
-    resolve(distDir, 'criterion-registry.json'),
-    resolve(distDir, 'skills/caveman-build/SKILL.md'),
-  ];
-  if (outputs.every((p) => existsSync(p))) {
-    const [outStats, newestInput] = await Promise.all([
-      Promise.all(outputs.map((p) => stat(p))),
-      maxMtime([
-        resolve(cliRoot, 'client'),
-        resolve(cliRoot, 'scripts/build.mjs'),
-        resolve(platRoot, 'packages/sdk-ts/src/sandboxes.ts'),
-        resolve(platRoot, 'packages/sdk-ts/src/sandboxes.generated.ts'),
-        resolve(platRoot, 'contracts/criterion-registry.json'),
-        resolve(platRoot, 'contracts/operations.public.json'),
-        resolve(platRoot, 'skills'),
-      ]),
+  try {
+    const saved = JSON.parse(await readFile(manifestPath, 'utf8'));
+    const [inputs, outputs] = await Promise.all([
+      snapshotTree(inputPaths, platRoot),
+      snapshotTree([distDir], distDir, '.build-manifest.json'),
     ]);
-    const oldestOutput = Math.min(...outStats.map((s) => s.mtimeMs));
-    if (oldestOutput >= newestInput) {
+    if (
+      Array.isArray(saved.inputs) &&
+      Array.isArray(saved.outputs) &&
+      outputs.length > 0 &&
+      JSON.stringify(inputs) === JSON.stringify(saved.inputs) &&
+      JSON.stringify(outputs) === JSON.stringify(saved.outputs)
+    ) {
       process.exit(0);
     }
+  } catch {
+    // Missing or unreadable manifest: rebuild.
   }
 }
 
@@ -104,4 +110,9 @@ await Promise.all([
     }
   }),
 ]);
+const [inputs, outputs] = await Promise.all([
+  snapshotTree(inputPaths, platRoot),
+  snapshotTree([distDir], distDir, '.build-manifest.json'),
+]);
+await writeFile(manifestPath, JSON.stringify({ inputs, outputs }));
 console.log('Built @caveman-ai/cloud (cvm) cleanly from platform/contracts');

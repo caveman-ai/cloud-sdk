@@ -317,7 +317,7 @@ test("gateway and eval clients never follow a redirect with credentials or the p
   const leaked = [];
   const elsewhere = await listen((req, res) => { leaked.push(req.headers); res.end("{}"); });
   const gateway = await listen((req, res) => { res.writeHead(307, { location: `${elsewhere.url}${req.url}` }).end(); });
-  t.after(() => { elsewhere.server.close(); gateway.server.close(); });
+  t.after(() => { elsewhere.server.closeAllConnections(); elsewhere.server.close(); gateway.server.closeAllConnections(); gateway.server.close(); });
   const cave = new Cave({ apiKey: "cave-secret", baseURL: gateway.url, agent: "test" });
   await assert.rejects(cave.openai({ upstreamKey: "sk-upstream" }).responses.create({ input: "prompt" }));
   await assert.rejects(cave.cavePlan());

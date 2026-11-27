@@ -59,7 +59,7 @@ async function fakeRouter(handler) {
     });
   });
   await new Promise((r) => server.listen(0, "127.0.0.1", r));
-  return { seen, url: `http://127.0.0.1:${server.address().port}`, close: () => server.close() };
+  return { seen, url: `http://127.0.0.1:${server.address().port}`, close: () => { server.closeAllConnections(); server.close(); } };
 }
 
 function runHook(box, payload, env = {}) {

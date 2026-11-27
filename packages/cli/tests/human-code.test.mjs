@@ -32,7 +32,7 @@ async function fixture(t,handler=()=>[200,{ok:true}]){
  });
  await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
  const url=`http://127.0.0.1:${server.address().port}`;
- t.after(async()=>{await new Promise(resolve=>server.close(resolve));await rm(home,{recursive:true,force:true});});
+ t.after(async()=>{server.closeAllConnections();await new Promise(resolve=>server.close(resolve));await rm(home,{recursive:true,force:true});});
  const save=async({baseURL=url,token=secret,refreshToken}={})=>{
   await writeFile(join(home,'.caveman','cloud.json'),JSON.stringify({baseURL,tokenStore:'file'}));
   await writeFile(join(home,'.caveman','credentials'),JSON.stringify({access_token:token,...(refreshToken?{refresh_token:refreshToken}:{}),gateway_api_key:gateway}),{mode:0o600});

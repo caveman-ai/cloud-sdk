@@ -32,7 +32,7 @@ async function api(t,routes={}){
  });
  await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
  const url=`http://127.0.0.1:${server.address().port}`;
- t.after(()=>new Promise(resolve=>server.close(resolve)));
+ t.after(()=>{server.closeAllConnections();return new Promise(resolve=>server.close(resolve));});
  const run=async(argv,{terminal=false,answers=[],env={},onSleep}={})=>{
   const out=[],err=[],asked=[],opened=[],slept=[];let clock=0,interrupt;
   const io={context:async()=>({baseURL:url,token:secret}),out:s=>{out.push(s);},err:s=>{err.push(s);},terminal:()=>terminal,

@@ -39,7 +39,7 @@ const settingsOf = (home) => JSON.parse(readFileSync(join(home, ".claude", "sett
 async function fakeRouter(handler) {
   const server = createServer(handler);
   await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
-  return { url: `http://127.0.0.1:${server.address().port}`, close: () => server.close() };
+  return { url: `http://127.0.0.1:${server.address().port}`, close: () => { server.closeAllConnections(); server.close(); } };
 }
 
 describe("claude-code", { concurrency: true }, () => {

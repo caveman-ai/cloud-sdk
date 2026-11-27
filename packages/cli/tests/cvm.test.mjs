@@ -35,7 +35,7 @@ async function cloud(handler){
  const seen=[];
  const server=createServer((req,res)=>{let body='';req.on('data',d=>body+=d);req.on('end',async()=>{seen.push({path:req.url,auth:req.headers.authorization,body});const [status,reply]=await handler(req,body);res.writeHead(status,{'content-type':'application/json'});res.end(JSON.stringify(reply));});});
  await new Promise(r=>server.listen(0,'127.0.0.1',r));
- return {seen,url:`http://127.0.0.1:${server.address().port}`,close:()=>server.close()};
+ return {seen,url:`http://127.0.0.1:${server.address().port}`,close:()=>{server.closeAllConnections();server.close();}};
 }
 
 describe('cvm', {concurrency: TEST_CONCURRENCY}, () => {

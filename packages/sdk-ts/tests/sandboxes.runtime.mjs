@@ -1,5 +1,6 @@
 import {describe, test} from 'node:test';
 import assert from 'node:assert/strict';
+import {createHash} from 'node:crypto';
 import {createServer} from 'node:http';
 import {CloudError, SandboxCommand, Sandboxes, SandboxError, SandboxExecError, SandboxFileError, SandboxStateError, SnapshotStateError, sandboxErrorCodes, sandboxRoutes, sandboxStream} from '../dist/sandboxes.js';
 import {startFake, wire} from './sandbox-fake.mjs';
@@ -7,7 +8,7 @@ import {startFake, wire} from './sandbox-fake.mjs';
 const client = (url, options = {}) => new Sandboxes({controlURL: url, apiKey: 'cave_live_wire', retryDelayMs: 0, ...options});
 const id = wire.rest.create.answer.id;
 
-describe('sandboxes', {concurrency: true}, () => {
+describe('sandboxes', {concurrency: 4}, () => {
 
 test('the plain calls send the key, the route and the body, and read the recorded answers', async t => {
   const fake = await startFake();
@@ -190,18 +191,22 @@ test('a stream whose host is restarting is opened again, within its bound, only 
 test('aborting ends the stream, and with it the command', async t => {
   let closed;
   const ended = new Promise(resolve => { closed = resolve; });
+  const controller = new AbortController();
   const server = createServer();
-  server.on('upgrade', async (req, socket) => {
-    const {createHash} = await import('node:crypto');
+  server.on('upgrade', (req, socket, head) => {
     const accept = createHash('sha1').update(req.headers['sec-websocket-key'] + '258EAFA5-E914-47DA-95CA-C5AB0DC85B11').digest('base64');
     socket.write(`HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: ${accept}\r\nSec-WebSocket-Protocol: ${sandboxStream.subprotocol}\r\n\r\n`);
-    socket.on('end', () => { closed(); socket.destroy(); });
+    socket.once('end', () => { closed(); socket.destroy(); });
+    socket.once('close', closed);
+    const abort = () => controller.abort(new DOMException('The operation was aborted due to timeout', 'TimeoutError'));
+    if (head.length > 0) queueMicrotask(abort);
+    else socket.once('data', abort);
     socket.resume();
   });
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
-  t.after(() => server.close());
+  t.after(() => { server.closeAllConnections(); server.close(); });
   const sandboxes = client(`http://127.0.0.1:${server.address().port}`);
-  await assert.rejects(sandboxes.exec(id, ['sleep', '60'], {signal: AbortSignal.timeout(200)}), {name: 'TimeoutError'});
+  await assert.rejects(sandboxes.exec(id, ['sleep', '60'], {signal: controller.signal}), {name: 'TimeoutError'});
   await ended;
 });
 
@@ -225,14 +230,13 @@ test('an abort that already happened opens no stream; a stdin that fails or neve
 
 test('a socket that breaks is a SandboxExecError cave_code_computer_stream_ended', async t => {
   const server = createServer();
-  server.on('upgrade', async (req, socket) => {
-    const {createHash} = await import('node:crypto');
+  server.on('upgrade', (req, socket) => {
     const accept = createHash('sha1').update(req.headers['sec-websocket-key'] + '258EAFA5-E914-47DA-95CA-C5AB0DC85B11').digest('base64');
     socket.write(`HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: ${accept}\r\nSec-WebSocket-Protocol: ${sandboxStream.subprotocol}\r\n\r\n`);
     socket.once('data', () => socket.resetAndDestroy());
   });
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
-  t.after(() => server.close());
+  t.after(() => { server.closeAllConnections(); server.close(); });
   await assert.rejects(client(`http://127.0.0.1:${server.address().port}`).run(id, ['true']), error => error instanceof SandboxExecError && error.code === 'cave_code_computer_stream_ended');
 });
 

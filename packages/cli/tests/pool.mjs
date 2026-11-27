@@ -1,8 +1,8 @@
 import { availableParallelism } from 'node:os';
 
 const cpus = availableParallelism();
-export const TEST_CONCURRENCY = Math.max(2, Math.min(cpus, 6));
-export const SPAWN_CONCURRENCY = Math.max(4, Math.min(cpus, 8));
+export const TEST_CONCURRENCY = cpus <= 4 ? 2 : Math.min(cpus, 6);
+export const SPAWN_CONCURRENCY = cpus <= 4 ? 3 : Math.min(cpus, 8);
 
 let active = 0;
 const queue = [];
@@ -24,12 +24,22 @@ export function limitSpawn(fn) {
 export async function mapPool(items, fn, limit = SPAWN_CONCURRENCY) {
   const results = new Array(items.length);
   let next = 0;
+  let failed = false;
   async function worker() {
-    while (next < items.length) {
+    while (!failed && next < items.length) {
       const index = next++;
-      results[index] = await fn(items[index], index);
+      try {
+        results[index] = await fn(items[index], index);
+      } catch (err) {
+        failed = true;
+        throw err;
+      }
     }
   }
-  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+  const settled = await Promise.allSettled(
+    Array.from({ length: Math.min(limit, items.length) }, worker),
+  );
+  const rejected = settled.find((entry) => entry.status === 'rejected');
+  if (rejected) throw rejected.reason;
   return results;
 }

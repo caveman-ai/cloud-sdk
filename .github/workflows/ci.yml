@@ -23,7 +23,7 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm -r build
-      - run: pnpm -r --no-sort --workspace-concurrency=8 test
+      - run: pnpm -r --workspace-concurrency=8 test
       - run: node scripts/check-public-hygiene.mjs
       - run: node --test skills/budget.test.mjs
 

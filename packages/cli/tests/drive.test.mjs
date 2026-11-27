@@ -806,12 +806,16 @@ test('a share token works with an empty HOME: the share mount, the token as the 
   [['drive','mv','a.md','sub/a.md'],'POST',`${share}/move`,{from:'/a.md',to:'/sub/a.md'}],
   [['drive','rm','a.md','--yes'],'POST',`${share}/delete`,{path:'/a.md'}],
   [['drive','log','a.md'],'GET',`${share}/history`,{path:'/a.md',limit:'1000'}],
- ],async([args,method,route,sent])=>{
-  const result=await f.run(args,env);
+ ],async([args,method,route,sent],index)=>{
+  const caseToken=`${token}-${index}`;
+  const result=await f.run(args,{CAVEMAN_DRIVE_TOKEN:caseToken,CAVE_API_URL:f.url});
   assert.equal(result.code,0,`${args.join(' ')}: ${result.stdout}${result.stderr}`);
-  const match=f.seen.find(req=>req.method===method&&req.route===route&&JSON.stringify(req.method==='POST'?req.body:req.method==='GET'&&sent===undefined?undefined:req.query)===JSON.stringify(sent));
-  assert.ok(match,args.join(' '));
-  assert.equal(match.headers.authorization,`Bearer ${token}`,args.join(' '));
+  const own=f.seen.filter(req=>req.headers.authorization===`Bearer ${caseToken}`);
+  assert.equal(own.length,1,args.join(' '));
+  const [req]=own;
+  assert.equal(req.method,method,args.join(' '));
+  assert.equal(req.route,route,args.join(' '));
+  if(sent!==undefined)assert.deepEqual(req.method==='POST'?req.body:req.query,sent,args.join(' '));
   JSON.parse(result.stdout);
  });
  assert.equal(await readFile(join(f.home,'copy.md'),'utf8'),'# a\n');
