@@ -8,43 +8,129 @@ on:
 permissions:
   contents: read
 
+# A newer push to the same pull request makes the older run moot. Pushes to main
+# get one group per commit (github.sha), because a shared group would cancel a
+# queued run and leave that merged commit untested.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
-  typescript:
-    name: TypeScript & Skills
-    runs-on: ubuntu-latest
+  # The CLI suite is the critical path (most of the old single job's time), so its
+  # test files are split across shards. node --test --test-shard puts every file
+  # in exactly one shard, so the union is always the whole suite.
+  cli:
+    name: CLI tests (${{ matrix.shard }}/4)
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
-          version: 10.14.0
-      - uses: actions/setup-node@v4
+          persist-credentials: false
+      # pnpm version comes from packageManager in package.json.
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: "24"
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm -r build
-      - run: pnpm -r test
+      - name: Test shard ${{ matrix.shard }}/4
+        working-directory: packages/cli
+        env:
+          SHARD: ${{ matrix.shard }}/4
+        # Run the package's own test script with a shard flag added. The script is
+        # read here, not copied, so a change to its build step is picked up; a test
+        # command of any other shape fails the job rather than running less.
+        run: |
+          script=$(node -p "require('./package.json').scripts.test")
+          tail='node --test tests/*.test.mjs'
+          case "$script" in
+            *"&& $tail") prefix=${script%"&& $tail"} ;;
+            *) echo "::error::packages/cli test script changed shape: $script"; exit 1 ;;
+          esac
+          echo "build: $prefix"
+          bash -ec "$prefix"
+          node --test --test-shard="$SHARD" tests/*.test.mjs
+
+  packages:
+    name: SDK and Router tests
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "24"
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm -r build
+      # Every workspace package except the CLI, which the cli shards cover.
+      - run: pnpm -r --filter '!@caveman-ai/cloud' test
+
+  hygiene:
+    name: Hygiene and skill budget
+    runs-on: blacksmith-2vcpu-ubuntu-2404
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "24"
       - run: node scripts/check-public-hygiene.mjs
       - run: node --test skills/budget.test.mjs
 
+  # Required check. Keeps its old name and still means every TypeScript, CLI,
+  # hygiene and skill check passed; skipped or cancelled parts count as failure.
+  typescript:
+    name: TypeScript & Skills
+    if: always()
+    needs: [cli, packages, hygiene]
+    runs-on: blacksmith-2vcpu-ubuntu-2404
+    timeout-minutes: 5
+    steps:
+      - name: All parts passed
+        env:
+          RESULTS: ${{ toJSON(needs) }}
+        run: |
+          echo "$RESULTS"
+          bad=$(echo "$RESULTS" | jq -r 'to_entries[] | select(.value.result != "success") | "\(.key)=\(.value.result)"')
+          if [ -n "$bad" ]; then echo "::error::not passed: $bad"; exit 1; fi
+
   go:
     name: Go SDK
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version: "1.24"
-          cache-dependency-path: go/go.sum
+          # The module has no dependencies and so no go.sum; key the cache on go.mod.
+          cache-dependency-path: go/go.mod
       - working-directory: go
         run: go vet ./... && go test -race ./...
 
   python:
     name: Python SDK
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-2vcpu-ubuntu-2404
+    timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.13"
       - run: pip install pytest
